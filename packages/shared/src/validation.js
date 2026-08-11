@@ -42,6 +42,30 @@ export const registrationSchema = z.object({
   password: z.string().min(8, "Password must be at least 8 characters"),
 });
 
+/** First-run bootstrap: the society, and the one account that can administer it. */
+export const setupSchema = z.object({
+  society: z.object({
+    name: z.string().trim().min(2, "Society name is required").max(160),
+    address: z.string().trim().max(240).optional().default(""),
+    regNo: z.string().trim().max(80).optional().default(""),
+    gstin: z.string().trim().max(20).optional().default(""),
+  }),
+  admin: z.object({
+    name: z.string().trim().min(2, "Your name is required").max(120),
+    email: z.string().email(),
+    phone: phone.optional().or(z.literal("")),
+    /* Longer than the resident minimum on purpose: this one account can read
+       every flat's dues and approve every registration in the society. */
+    password: z.string().min(12, "Use at least 12 characters for the administrator account"),
+    designation: z.string().trim().max(60).optional().default("Secretary"),
+  }),
+});
+
+export const importFlatsSchema = z.object({
+  csv: z.string().min(1, "Paste or upload a CSV first").max(2_000_000),
+  mode: z.enum(["preview", "apply"]).default("preview"),
+});
+
 export const createVisitorSchema = z.object({
   name: z.string().trim().min(1).max(120),
   category: z.enum(VISITOR_CATEGORIES),

@@ -5,6 +5,7 @@ import rateLimit from "express-rate-limit";
 import { config } from "./config.js";
 import { forbidden } from "./lib/errors.js";
 import { authRouter } from "./routes/auth.js";
+import { setupRouter } from "./routes/setup.js";
 import { meRouter } from "./routes/me.js";
 import { flatsRouter, registrationsRouter } from "./routes/flats.js";
 import { visitorsRouter } from "./routes/visitors.js";
@@ -56,6 +57,7 @@ export function createApp() {
     }
   });
 
+  app.use("/api/setup", setupRouter);
   app.use("/api/auth", authRouter);
   app.use("/api/me", meRouter);
   app.use("/api/flats", flatsRouter);

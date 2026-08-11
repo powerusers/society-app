@@ -1,12 +1,12 @@
 import { Router } from "express";
 import { z } from "zod";
-import { can } from "@gvs/shared";
+import { can, parseFlatRegister, importFlatsSchema } from "@gvs/shared";
 import { many, one, tx } from "../db/pool.js";
 import { requireAuth, requireCap } from "../middleware/auth.js";
 import { validate } from "../middleware/validate.js";
 import { audit, auditCtx } from "../lib/audit.js";
 import { flat as toFlat, directoryUser } from "../lib/serialize.js";
-import { conflict, notFound, wrap } from "../lib/errors.js";
+import { conflict, notFound, unprocessable, wrap } from "../lib/errors.js";
 
 export const flatsRouter = Router();
 flatsRouter.use(requireAuth);
@@ -24,6 +24,91 @@ flatsRouter.get("/", wrap(async (req, res) => {
   res.json({
     flats: rows.map((f) => ({ ...toFlat(f), ...(withDues ? { dues: Number(f.dues) } : {}) })),
   });
+}));
+
+/**
+ * Import the society's flat register from a CSV.
+ *
+ * Two modes. `preview` parses and reports what would happen without touching a
+ * row; `apply` writes. The preview exists because a register is not a list of
+ * strings — carpet area drives every per-square-foot billing head, so a column
+ * mapped to the wrong field would quietly change what every flat is charged.
+ *
+ * Nothing is ever deleted. Flats CASCADE into bills, payments and gate history,
+ * so a code missing from the file means "not in this spreadsheet", not "no
+ * longer exists" — removing one is a deliberate act that needs its own flow.
+ */
+flatsRouter.post("/import", requireCap("settings.write"), validate(importFlatsSchema), wrap(async (req, res) => {
+  const parsed = parseFlatRegister(req.body.csv);
+  if (!parsed.ok) throw unprocessable(parsed.error);
+  if (!parsed.rows.length) throw unprocessable("That file has a header row but no flats under it");
+
+  const societyId = req.user.society_id;
+  const existing = new Map(
+    (await many("SELECT code, block, floor, type, area, occupancy, parking_slots FROM flats WHERE society_id = $1", [societyId]))
+      .map((f) => [f.code, f]),
+  );
+
+  const unchangedFrom = (before, after) =>
+    before.block === after.block && before.floor === after.floor && before.type === after.type &&
+    Number(before.area) === after.area && before.occupancy === after.occupancy &&
+    Number(before.parking_slots) === after.parkingSlots;
+
+  const rows = parsed.rows.map((r) => {
+    if (!r.ok) return { line: r.line, code: r.flat.code, action: "invalid", errors: r.errors };
+    const before = existing.get(r.flat.code);
+    if (!before) return { line: r.line, code: r.flat.code, action: "create", flat: r.flat };
+    return {
+      line: r.line, code: r.flat.code, flat: r.flat,
+      action: unchangedFrom(before, r.flat) ? "unchanged" : "update",
+    };
+  });
+
+  const summary = rows.reduce((acc, r) => ({ ...acc, [r.action]: (acc[r.action] || 0) + 1 }),
+    { create: 0, update: 0, unchanged: 0, invalid: 0 });
+
+  if (req.body.mode !== "apply") return res.json({ mode: "preview", summary, rows });
+
+  /* Refuse a partial write. Half an imported register is harder to reason
+     about than none of it, and the admin has already seen exactly which lines
+     are wrong in the preview. */
+  if (summary.invalid > 0) {
+    throw unprocessable(
+      `${summary.invalid} row${summary.invalid === 1 ? "" : "s"} could not be read — fix them and import again`,
+      Object.fromEntries(rows.filter((r) => r.action === "invalid").slice(0, 50).map((r) => [`line ${r.line}`, Object.values(r.errors)[0]])),
+    );
+  }
+
+  const written = await tx(async (c) => {
+    for (const r of rows) {
+      if (r.action === "unchanged") continue;
+      await c.query(
+        `INSERT INTO flats (society_id, code, block, floor, type, area, occupancy, parking_slots)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+         ON CONFLICT (society_id, code) DO UPDATE SET
+           block = EXCLUDED.block, floor = EXCLUDED.floor, type = EXCLUDED.type,
+           area = EXCLUDED.area, occupancy = EXCLUDED.occupancy, parking_slots = EXCLUDED.parking_slots`,
+        [societyId, r.flat.code, r.flat.block, r.flat.floor, r.flat.type, r.flat.area, r.flat.occupancy, r.flat.parkingSlots],
+      );
+    }
+
+    /* Blocks drive the registration dropdown, so derive them from the register
+       that now exists rather than leaving a hand-typed list to go stale. */
+    const all = await c.query("SELECT DISTINCT block FROM flats WHERE society_id = $1 ORDER BY block", [societyId]);
+    await c.query(
+      "UPDATE societies SET settings = jsonb_set(settings, '{blocks}', $2::jsonb) WHERE id = $1",
+      [societyId, JSON.stringify(all.rows.map((r) => r.block))],
+    );
+    return all.rows.map((r) => r.block);
+  });
+
+  await audit(auditCtx(req), {
+    action: "flats.import",
+    entity: `${summary.create} created, ${summary.update} updated`,
+    after: { blocks: written, ...summary },
+  });
+
+  res.json({ mode: "apply", summary, blocks: written });
 }));
 
 flatsRouter.get("/:code", wrap(async (req, res) => {
