@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Icons from "../icons";
-import { Btn, Input, Select, Alert } from "../components/ui";
+import { Btn, Input, Select, Alert, SearchBar, SkeletonList } from "../components/ui";
 import { useApp } from "../store";
+import Setup from "./Setup";
 import { api, isLive } from "../lib/api";
 import { iso } from "../lib/format";
 
@@ -39,6 +40,7 @@ export default function Login() {
   };
 
   if (mode === "register") return <Register onBack={() => setMode("login")} />;
+  if (mode === "setup") return <Setup onDone={() => setMode("login")} onBack={() => setMode("login")} />;
 
   return (
     <div className="app" style={{ background: "linear-gradient(165deg,var(--b700) 0%,var(--b800) 55%,var(--b900) 100%)", padding: "48px 20px 36px" }}>
@@ -70,6 +72,15 @@ export default function Login() {
         <p className="muted" style={{ textAlign: "center", marginTop: 14 }}>
           New resident? <button className="linkbtn" onClick={() => setMode("register")}>Register your flat</button>
         </p>
+        {/* Once a society exists the setup screen stops appearing on its own,
+            so onboarding the next one needs a way in. It still asks for the
+            token, which is what actually gates it. */}
+        {live && (
+          <p className="muted" style={{ textAlign: "center", marginTop: 8 }}>
+            Bringing a new society on board?{" "}
+            <button className="linkbtn" onClick={() => setMode("setup")}>Set it up</button>
+          </p>
+        )}
       </div>
 
       {/* Demo shortcuts exist only in the no-API build — a live deployment must
@@ -109,10 +120,37 @@ function Register({ onBack }) {
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(false);
 
+  /* One deployment serves many societies, so the applicant has to say which
+     one — it decides both which flat register their code is checked against
+     and which committee is asked to approve them. */
+  const [societies, setSocieties] = useState([]);
+  const [societyId, setSocietyId] = useState("");
+  const [q, setQ] = useState("");
+  const [loadingSocieties, setLoadingSocieties] = useState(live);
+
+  useEffect(() => {
+    if (!live) return;
+    let alive = true;
+    setLoadingSocieties(true);
+    const t = setTimeout(() => {
+      api.societies(q)
+        .then((r) => { if (alive) setSocieties(r.societies || []); })
+        .catch(() => { if (alive) setSocieties([]); })
+        .finally(() => { if (alive) setLoadingSocieties(false); });
+    }, q ? 250 : 0);
+    return () => { alive = false; clearTimeout(t); };
+  }, [live, q]);
+
+  const chosen = societies.find((s) => s.id === societyId);
+  /* Blocks belong to the chosen society's register, so the dropdown cannot be
+     filled until one is chosen. Free text is the honest control until then. */
+  const blocks = live ? [] : (db.settings.blocks || ["A", "B", "C", "D", "E"]);
+
   const submit = async () => {
     setErr(""); setFieldErr({});
-    const flatCode = `${f.block}-${f.flatNo}`;
-    const payload = { name: f.name.trim(), flatCode, relation: f.relation, phone: f.phone, email: f.email, password: f.password };
+    const flatCode = `${f.block.trim().toUpperCase()}-${f.flatNo.trim()}`;
+    const payload = { name: f.name.trim(), societyId, flatCode, relation: f.relation, phone: f.phone, email: f.email, password: f.password };
+    if (live && !societyId) return setErr("Choose your society first");
 
     if (!live) {
       if (!payload.name) return setErr("Enter your full name");
@@ -158,17 +196,61 @@ function Register({ onBack }) {
             <Alert kind="info">
               Your details are verified against the society's flat register before approval. Owners are asked for the sale deed; tenants for a rent agreement and police verification.
             </Alert>
+            {live && (
+              <div className="card">
+                <p className="h4" style={{ marginBottom: 4 }}>Your society</p>
+                <p className="tiny" style={{ marginBottom: 10 }}>
+                  Your application goes to this society's committee for approval.
+                </p>
+                <SearchBar value={q} onChange={setQ} placeholder="Search by name or address…" />
+                {loadingSocieties ? <SkeletonList rows={2} /> : (
+                  <div className="list">
+                    {societies.map((s) => (
+                      <div key={s.id} className={`li tap${s.id === societyId ? " on" : ""}`}
+                        onClick={() => { setSocietyId(s.id); setErr(""); }}>
+                        <div className="grow">
+                          <p className="h4">{s.name}</p>
+                          {s.address && <p className="tiny" style={{ marginTop: 3 }}>{s.address}</p>}
+                        </div>
+                        {s.id === societyId
+                          ? <Icons.CheckCircle size={18} style={{ color: "var(--accent)" }} />
+                          : <span style={{ width: 18 }} />}
+                      </div>
+                    ))}
+                    {!societies.length && (
+                      <div className="li">
+                        <p className="tiny">
+                          {q ? `No society matches "${q}".` : "No societies are set up on this platform yet."}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
             <div className="card">
               <Input label="Full name" value={f.name} error={fieldErr.name} onChange={(e) => u("name", e.target.value)} placeholder="e.g. Rahul Mehta" />
               <div style={{ display: "flex", gap: 10 }}>
                 <div style={{ flex: 1 }}>
-                  <Select label="Block" value={f.block} onChange={(e) => u("block", e.target.value)}
-                    options={(db.settings.blocks || ["A", "B", "C", "D", "E"]).map((b) => ({ value: b, label: `Block ${b}` }))} />
+                  {blocks.length ? (
+                    <Select label="Block" value={f.block} onChange={(e) => u("block", e.target.value)}
+                      options={blocks.map((b) => ({ value: b, label: `Block ${b}` }))} />
+                  ) : (
+                    <Input label="Block" value={f.block} maxLength={2} error={fieldErr.flatCode}
+                      onChange={(e) => u("block", e.target.value.replace(/[^A-Za-z]/g, "").toUpperCase())}
+                      placeholder="e.g. C" />
+                  )}
                 </div>
                 <div style={{ flex: 1 }}>
                   <Input label="Flat no." value={f.flatNo} error={fieldErr.flatCode} onChange={(e) => u("flatNo", e.target.value)} placeholder="e.g. 401 or 1003" />
                 </div>
               </div>
+              {chosen && (
+                <p className="hint" style={{ marginTop: -4 }}>
+                  Checked against the flat register for {chosen.name}.
+                </p>
+              )}
               <Select label="I am the" value={f.relation} onChange={(e) => u("relation", e.target.value)}
                 options={[{ value: "owner", label: "Owner" }, { value: "co-owner", label: "Co-owner / family" }, { value: "tenant", label: "Tenant" }]} />
               <Input label="Mobile" type="tel" maxLength={10} value={f.phone} error={fieldErr.phone}

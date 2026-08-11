@@ -35,6 +35,10 @@ export const refreshSchema = z.object({
 
 export const registrationSchema = z.object({
   name: z.string().trim().min(2).max(120),
+  /* Both the missing and the malformed case say the same thing: from the form's
+     side they are one mistake, and "Required" names a field the applicant never
+     sees — they chose from a list. */
+  societyId: z.string({ required_error: "Choose your society" }).uuid("Choose your society"),
   flatCode,
   relation: z.enum(RELATIONS),
   phone,

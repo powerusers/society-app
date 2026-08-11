@@ -254,6 +254,9 @@ textarea.inp{min-height:88px;resize:vertical;line-height:1.5}
 .li.tap{transition:background .1s}
 .li.tap:hover{background:var(--n25)}
 .li.tap:active{background:var(--n50)}
+/* A chosen row in a pick-one list. Tinted rather than outlined so the list
+   still reads as one block instead of a stack of separate cards. */
+.li.on{background:var(--accent-soft)}
 
 .avatar{width:34px;height:34px;border-radius:var(--r-pill);display:flex;align-items:center;justify-content:center;
   font-weight:550;font-size:12px;flex-shrink:0;background:var(--n100);color:var(--ink-2);letter-spacing:-.01em}

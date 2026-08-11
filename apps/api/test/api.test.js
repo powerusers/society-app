@@ -515,12 +515,30 @@ describe("helpdesk", () => {
 /* --------------------------------------------------------- registration */
 
 describe("resident registration", () => {
-  const applicant = { name: "Nikhil Bhat", flatCode: "E-604", relation: "owner", phone: "9876500123", email: "nikhil.new@email.com", password: "a-good-password" };
+  /* An applicant names their society: one deployment can host several, and it
+     decides both which register the flat code is checked against and which
+     committee is asked to approve. */
+  let applicant;
+
+  before(async () => {
+    const { body } = await get("/api/setup/societies");
+    applicant = {
+      name: "Nikhil Bhat", societyId: body.societies[0].id, flatCode: "E-604",
+      relation: "owner", phone: "9876500123", email: "nikhil.new@email.com", password: "a-good-password",
+    };
+  });
+
+  test("an application without a society is refused", async () => {
+    const { societyId, ...noSociety } = applicant;
+    const { status, body } = await post("/api/auth/register", noSociety);
+    assert.equal(status, 422);
+    assert.match(body.error.details.societyId, /society/i);
+  });
 
   test("an application for a flat that does not exist is refused", async () => {
     const { status, body } = await post("/api/auth/register", { ...applicant, flatCode: "Z-999" });
     assert.equal(status, 409);
-    assert.match(body.error.message, /not on the society register/);
+    assert.match(body.error.message, /not on the register/);
   });
 
   test("a valid application is stored as pending, not as an account", async () => {
