@@ -65,6 +65,18 @@ export const setupSchema = z.object({
   }),
 });
 
+export const createInviteSchema = z.object({
+  /* What the operator will recognise this code by in a list — the code itself
+     is only ever shown once, so without a label an outstanding invite is an
+     anonymous row. */
+  label: z.string().trim().max(120).optional().default(""),
+  /* Pins. Both optional: a code with neither is a general-purpose invite, one
+     with both can create exactly one society for exactly one person. */
+  societyName: z.string().trim().min(2).max(160).nullish(),
+  email: z.string().email().nullish(),
+  days: z.coerce.number().int().min(1).max(90).optional().default(14),
+});
+
 export const importFlatsSchema = z.object({
   csv: z.string().min(1, "Paste or upload a CSV first").max(2_000_000),
   mode: z.enum(["preview", "apply"]).default("preview"),

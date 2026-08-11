@@ -25,7 +25,7 @@ export default function Setup({ onDone, onBack }) {
 
   const submit = async () => {
     setErr(""); setFieldErr({});
-    if (!token.trim()) return setErr("Enter the setup token from the API environment");
+    if (!token.trim()) return setErr("Enter your invite code");
 
     setBusy(true);
     try {
@@ -100,11 +100,12 @@ export default function Setup({ onDone, onBack }) {
             onChange={(e) => u("password", e.target.value)} placeholder="Minimum 12 characters" />
         </div>
 
-        <p className="h4" style={{ margin: "14px 0 8px" }}>Setup token</p>
+        <p className="h4" style={{ margin: "14px 0 8px" }}>Invite code</p>
         <div className="card">
-          <Input label="Token" value={token} onChange={(e) => setToken(e.target.value)}
-            hint="The SETUP_TOKEN set in the API environment. It proves you run this deployment — without it, whoever found this page first would become its administrator."
-            placeholder="Paste the token" />
+          <Input label="Code" value={token} onChange={(e) => setToken(e.target.value)}
+            style={{ fontFamily: "var(--mono)", letterSpacing: ".04em" }}
+            hint="The code you were sent to bring this society on board. Without one, whoever found this page first would become its administrator."
+            placeholder="ABCD-EFGH-JKMN" />
         </div>
 
         {err && <p className="err" style={{ margin: "12px 0" }}>{err}</p>}

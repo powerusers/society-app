@@ -1,6 +1,8 @@
 import { Router } from "express";
+import { timingSafeEqual } from "node:crypto";
 import rateLimit from "express-rate-limit";
-import { setupSchema, DEFAULT_HEADS } from "@gvs/shared";
+import { setupSchema, createInviteSchema, DEFAULT_HEADS } from "@gvs/shared";
+import { createInvite, listInvites, revokeInvite, claimInvite, attachInviteToSociety } from "../lib/invites.js";
 import { many, one, tx } from "../db/pool.js";
 import { config } from "../config.js";
 import { validate } from "../middleware/validate.js";
@@ -8,7 +10,7 @@ import { hashPassword } from "../lib/password.js";
 import { signAccessToken, issueRefreshToken } from "../lib/tokens.js";
 import { audit } from "../lib/audit.js";
 import { publicUser } from "../lib/serialize.js";
-import { forbidden, conflict, wrap, AppError } from "../lib/errors.js";
+import { forbidden, conflict, notFound, wrap, AppError } from "../lib/errors.js";
 
 export const setupRouter = Router();
 
@@ -19,13 +21,51 @@ export const setupRouter = Router();
 
 const setupLimiter = rateLimit({
   windowMs: 15 * 60_000,
-  limit: 10,
+  /* Ten attempts an hour-quarter is the brake on guessing an invite code in
+     production. Outside it the limit only throttles the test suite, which
+     redeems codes far faster than any person would. */
+  limit: config.isProd ? 10 : 1000,
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: { code: "rate_limited", message: "Too many attempts. Try again in a few minutes." } },
 });
 
 const societyExists = async () => Boolean(await one("SELECT id FROM societies LIMIT 1"));
+
+/** Compares without leaking the answer through how long it took. */
+function timingSafeEqualStr(a, b) {
+  const x = Buffer.from(String(a));
+  const y = Buffer.from(String(b));
+  return x.length === y.length && timingSafeEqual(x, y);
+}
+
+/** Issuing and revoking invites is the operator's own key — never an invite. */
+const requireOperator = (req, _res, next) => {
+  if (!config.setupToken) {
+    return next(new AppError(503, "setup_unavailable", "SETUP_TOKEN is not set on this API."));
+  }
+  if (!timingSafeEqualStr(req.get("x-setup-token") || "", config.setupToken)) {
+    return next(forbidden("That setup token is not correct."));
+  }
+  next();
+};
+
+setupRouter.get("/invites", requireOperator, wrap(async (_req, res) => {
+  res.json({ invites: await listInvites() });
+}));
+
+setupRouter.post("/invites", requireOperator, validate(createInviteSchema), wrap(async (req, res) => {
+  const invite = await createInvite(req.body);
+  /* The code is in this response and nowhere else — only its hash is stored,
+     so a lost code is reissued rather than looked up. */
+  res.status(201).json({ invite });
+}));
+
+setupRouter.delete("/invites/:id", requireOperator, wrap(async (req, res) => {
+  const gone = await revokeInvite(req.params.id);
+  if (!gone) throw notFound("No open invite with that id");
+  res.status(204).end();
+}));
 
 /**
  * Lets the sign-in screen decide whether to offer setup. It reveals only
@@ -57,24 +97,33 @@ setupRouter.get("/societies", wrap(async (req, res) => {
 }));
 
 setupRouter.post("/", setupLimiter, validate(setupSchema), wrap(async (req, res) => {
-  /* Without a token this endpoint would hand society-wide administrator rights
-     to whoever reached a freshly deployed URL first. Refusing to run is the
-     only safe default: an operator can set the variable, but nobody outside
-     the deployment can. */
+  /* Unguarded, this endpoint would hand society-wide administrator rights to
+     whoever reached a freshly deployed URL first. Refusing to run is the only
+     safe default: an operator can set the variable, but nobody outside the
+     deployment can. */
   if (!config.setupToken) {
     throw new AppError(503, "setup_unavailable",
       "Set SETUP_TOKEN in the API environment before running first-time setup.");
   }
-  const offered = req.get("x-setup-token") || "";
-  if (offered !== config.setupToken) throw forbidden("That setup token is not correct.");
 
-  /* One deployment serves many societies, so this no longer closes after the
-     first. The token is what gates it every time: onboarding a society stays
-     an operator action rather than something any visitor can do. */
   const { society, admin } = req.body;
+  const offered = req.get("x-setup-token") || "";
+  if (!offered) throw forbidden("Enter your invite code.");
+
+  /* Two credentials arrive through the same header, because to the person
+     typing it there is one box. The operator token is the master key and is
+     never shared; an invite is the thing you hand to a secretary — one
+     society, one use, expiring, and revocable on its own. */
+  const isOperator = timingSafeEqualStr(offered, config.setupToken);
   const passwordHash = await hashPassword(admin.password);
 
   const created = await tx(async (c) => {
+    let invite = null;
+    if (!isOperator) {
+      const claim = await claimInvite(c, offered, { societyName: society.name, email: admin.email });
+      if (!claim.ok) throw forbidden(claim.reason);
+      invite = claim.invite;
+    }
     /* Serialise creation so two requests for the same society name cannot both
        pass their checks and land as duplicates residents could not tell apart.
        The unique index on lower(name) is the real guarantee; this turns the
@@ -126,13 +175,22 @@ setupRouter.post("/", setupLimiter, validate(setupSchema), wrap(async (req, res)
       [row.id, ["visitor-entry", "qr-scan"]],
     );
 
-    return { society: row, user };
+    /* Recorded only now the society exists, and inside the same transaction:
+       a setup that fails after redemption rolls the code back with it, rather
+       than burning a single-use invite on an attempt that created nothing. */
+    if (invite) await attachInviteToSociety(c, invite.id, row.id);
+
+    return { society: row, user, invite };
   });
 
   const refresh = await issueRefreshToken(created.user.id);
   await audit(
     { societyId: created.society.id, userId: created.user.id, ip: req.ip },
-    { action: "society.setup", entity: created.society.name },
+    {
+      action: "society.setup",
+      entity: created.society.name,
+      detail: created.invite ? `invite ${created.invite.label || created.invite.id}` : "operator token",
+    },
   );
 
   res.status(201).json({
