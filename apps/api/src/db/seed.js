@@ -1,5 +1,6 @@
 import { fileURLToPath } from "node:url";
 import { DEFAULT_HEADS, computeBill, currentCycle, shiftCycle, narrationFor, receiptNoFor } from "@gvs/shared";
+import { config } from "../config.js";
 import { pool, tx, closePool } from "./pool.js";
 import { migrate } from "./migrate.js";
 import { hashPassword } from "../lib/password.js";
@@ -40,6 +41,15 @@ export async function seed({ silent = false } = {}) {
   return tx(async (c) => {
     const already = await c.query("SELECT id FROM societies LIMIT 1");
     if (already.rows.length) {
+      /* This is not an upsert — it destroys every flat, bill, payment and
+         audit row in the database. Harmless against a dev box, unrecoverable
+         against a deployed one, so production has to say so out loud. */
+      if (config.isProd && process.env.SEED_CONFIRM !== "wipe") {
+        throw new Error(
+          "Refusing to reseed: this database already holds a society, and seeding " +
+          "TRUNCATEs every table. Re-run with SEED_CONFIRM=wipe if that is genuinely what you want.",
+        );
+      }
       log("[seed] a society already exists — wiping and reseeding");
       await c.query("TRUNCATE societies CASCADE");
       await c.query("ALTER SEQUENCE ticket_ref_seq RESTART WITH 2045");

@@ -4,6 +4,9 @@ dist
 *.local
 .env
 .env.*
+# The template carries no secrets and is the only record of what the API needs
+# in its environment — without this negation `.env.*` silently swallows it.
+!.env.example
 
 .shots
 
