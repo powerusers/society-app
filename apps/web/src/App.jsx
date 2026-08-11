@@ -1,5 +1,5 @@
-import { useCallback, useMemo, useState } from "react";
-import { CSS } from "./styles";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { CSS, ACCENTS, applyAccent } from "./styles";
 import Icons from "./icons";
 import { AppProvider, useApp } from "./store";
 import { Toast } from "./components/ui";
@@ -164,7 +164,7 @@ function Shell() {
             </p>
           </div>
           {role !== "guard" && (
-            <button className="iconbtn" onClick={raiseSos} aria-label="Emergency SOS" style={{ background: "rgba(255,90,90,.28)" }}>
+            <button className="iconbtn alarm" onClick={raiseSos} aria-label="Emergency SOS">
               <Icons.Sos size={19} />
             </button>
           )}
@@ -220,7 +220,10 @@ function SosOverlay({ onClose, db }) {
 }
 
 function Root() {
-  const { me, booting } = useApp();
+  const { me, booting, db } = useApp();
+  /* The accent is a society setting, not a constant — the app is not themed
+     after whatever the society happens to be called. */
+  useEffect(() => { applyAccent(db.settings.accent); }, [db.settings.accent]);
   if (booting) return <Booting />;
   return me ? <Shell /> : <Login />;
 }

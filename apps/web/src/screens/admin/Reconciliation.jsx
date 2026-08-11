@@ -77,7 +77,7 @@ export default function Reconciliation() {
       </div>
 
       <div style={{ marginTop: 12 }}>
-        <Alert kind="ok" icon={Icons.Bank}>
+        <Alert icon={Icons.Bank}>
           Every UPI credit carries the flat number in the bank narration, so an MT940 import matches receipts automatically instead of someone reading a passbook line by line.
         </Alert>
       </div>

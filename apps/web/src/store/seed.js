@@ -423,6 +423,7 @@ export function buildSeed() {
     version: 4,
     settings: {
       societyName: "Green Valley Society",
+      accent: "indigo",
       address: "Baner Road, Pune 411045",
       regNo: "PNA/GNL/(O)/HSG/(TC)/9214/2011",
       blocks: BLOCKS,

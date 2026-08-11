@@ -21,9 +21,9 @@ export const STATUS_COLOR = {
   "pending-approval": "purple", draft: "", confirmed: "green", cancelled: "red", active: "green",
 };
 
-export const CatTile = ({ category, size = 18 }) => {
+export const CatTile = ({ category, size = 17 }) => {
   const c = catOf(category);
-  return <div className={`ico-tile ${c.tone}`}><c.icon size={size} /></div>;
+  return <div className="ico-tile"><c.icon size={size} /></div>;
 };
 
 /** Live overstay state for a visitor who is currently inside the building. */
@@ -43,31 +43,43 @@ export function OverstayPill({ v, defaultMins }) {
     : <Badge color="green"><Icons.Clock size={11} /> {o.limit - o.spent}m left</Badge>;
 }
 
-export function VisitorCard({ v, actions, accent }) {
+export function VisitorCard({ v, actions }) {
   const { db, sel } = useApp();
   const c = catOf(v.category);
+  /* Detail is written as one sentence rather than stacked micro-lines: it reads
+     faster and stops every record turning into a five-row block. */
+  const detail = [c.label, `Flat ${v.flatCode}`, v.gateName || sel.gate(v.gateId)?.name].filter(Boolean).join(" · ");
+  const meta = [v.purpose, v.phone, v.raisedBy && `via ${v.raisedBy}`].filter(Boolean).join(" · ");
+
   return (
-    <div className="card" style={accent ? { borderLeft: `3px solid ${accent}` } : undefined}>
+    <div className="card">
       <div className="row top">
-        <CatTile category={v.category} />
         <div className="grow">
           <p className="h3 truncate">{v.name}</p>
-          <p className="tiny" style={{ marginTop: 3 }}>
-            {c.label} · Flat <b style={{ color: "var(--ink-2)" }}>{v.flatCode}</b> · {sel.gate(v.gateId)?.name || "Main Gate"}
-          </p>
-          {v.purpose && <p className="tiny" style={{ marginTop: 3 }}>{v.purpose}</p>}
-          {v.phone && <p className="tiny" style={{ marginTop: 3 }}>{v.phone}</p>}
-          {v.raisedBy && <p className="tiny" style={{ marginTop: 3 }}>Raised by {v.raisedBy}</p>}
+          <p className="tiny" style={{ marginTop: 4 }}>{detail}</p>
+          {meta && <p className="tiny" style={{ marginTop: 3 }}>{meta}</p>}
         </div>
         <div className="right" style={{ flexShrink: 0 }}>
           <Badge color={STATUS_COLOR[v.status]}>{v.status}</Badge>
           <p className="tiny" style={{ marginTop: 5 }}>{ago(v.createdAt)}</p>
-          <div style={{ marginTop: 5 }}><OverstayPill v={v} defaultMins={db.settings.overstayMins} /></div>
         </div>
       </div>
+      <OverstayNote v={v} defaultMins={db.settings.overstayMins} />
       {actions && <div className="wrap" style={{ marginTop: 13, gap: 8 }}>{actions}</div>}
     </div>
   );
+}
+
+/** Only rendered once a visitor is actually inside — and loud only when over. */
+export function OverstayNote({ v, defaultMins }) {
+  useTick(20000);
+  const o = overstay(v, defaultMins);
+  if (!o) return null;
+  return o.over
+    ? <p className="tiny" style={{ marginTop: 8, color: "var(--bad)", fontWeight: 500 }}>
+        Inside {o.spent} min — {o.by} over the {o.limit} minute limit
+      </p>
+    : <p className="tiny" style={{ marginTop: 8 }}>Inside {o.spent} of {o.limit} minutes</p>;
 }
 
 const NOTICE_KIND = {
@@ -82,11 +94,11 @@ export function NoticeCard({ n, onOpen }) {
   const k = NOTICE_KIND[n.kind] || NOTICE_KIND.notice;
   return (
     <div className="card tap" onClick={onOpen} role="button">
-      <div className="row" style={{ marginBottom: 8 }}>
+      <div className="row" style={{ marginBottom: 7 }}>
         <div className="wrap">
-          <Badge color={k.tone}><k.icon size={11} /> {k.label}</Badge>
-          {n.pinned && <Badge color="purple">Pinned</Badge>}
-          {n.priority === "high" && <Badge color="red"><span className="dotmark" /> Urgent</Badge>}
+          <Badge color={k.tone}>{k.label}</Badge>
+          {n.pinned && <Badge>Pinned</Badge>}
+          {n.priority === "high" && <Badge className="solid">Urgent</Badge>}
         </div>
         <span className="tiny">{ago(n.at)}</span>
       </div>
@@ -96,9 +108,9 @@ export function NoticeCard({ n, onOpen }) {
         <span className="tiny">{sel.userName(n.author)}</span>
         <div className="wrap">
           {Object.entries(n.reactions || {}).map(([e, c]) => (
-            <span key={e} className="badge">{e} {c}</span>
+            <span key={e} className="badge bare">{e} {c}</span>
           ))}
-          {n.comments?.length > 0 && <span className="badge"><Icons.Chat size={11} /> {n.comments.length}</span>}
+          {n.comments?.length > 0 && <span className="badge bare"><Icons.Chat size={11} /> {n.comments.length}</span>}
         </div>
       </div>
     </div>
@@ -112,20 +124,17 @@ export function TicketRow({ t, onOpen }) {
   const breached = live && sla.late;
   return (
     <div className="li tap" onClick={onOpen} role="button">
-      <div className={`ico-tile ${breached ? "red" : "plain"}`}>
-        <Icons.Ticket size={18} />
-      </div>
       <div className="grow">
         <p className="h4 truncate">{t.title}</p>
         <p className="tiny" style={{ marginTop: 3 }}>
           {t.ref} · {t.category} · {t.flatCode} · {ago(t.at)}
+          {t.assignedToName || t.assignedTo ? ` · ${t.assignedToName || sel.userName(t.assignedTo)}` : ""}
         </p>
-        <div className="wrap" style={{ marginTop: 6 }}>
+        <div className="wrap" style={{ marginTop: 6, gap: 12 }}>
           <Badge color={STATUS_COLOR[t.status]}>{t.status}</Badge>
-          <Badge color={t.priority === "high" ? "red" : t.priority === "medium" ? "amber" : ""}>{t.priority}</Badge>
-          {live && <Badge color={breached ? "red" : "green"}>{breached ? `SLA over by ${sla.txt}` : `${sla.txt} to SLA`}</Badge>}
-          {t.source === "ai-call" && <Badge color="purple"><Icons.Mic size={10} /> AI call</Badge>}
-          {t.assignedTo && <Badge color="blue">{sel.userName(t.assignedTo)}</Badge>}
+          {t.priority === "high" && <Badge color="red">high priority</Badge>}
+          {live && breached && <Badge color="red">SLA over by {sla.txt}</Badge>}
+          {live && !breached && <Badge>{sla.txt} to SLA</Badge>}
         </div>
       </div>
       <Icons.Fwd size={15} style={{ color: "var(--ink-4)" }} />
@@ -138,7 +147,6 @@ export function BillRow({ b, onOpen }) {
   const p = sel.paymentOf(b.id);
   return (
     <div className="li tap" onClick={onOpen} role="button">
-      <div className="ico-tile plain"><Icons.Doc size={17} /></div>
       <div className="grow">
         <p className="h4">{cycleLabel(b.cycle)}</p>
         <p className="tiny" style={{ marginTop: 3 }}>
@@ -160,13 +168,12 @@ export function HelpRow({ h, right, onClick }) {
       <div className="grow">
         <p className="h4 truncate">{h.name}</p>
         <p className="tiny" style={{ marginTop: 3 }}>{h.role} · {h.flats.join(", ")}</p>
-        <div className="wrap" style={{ marginTop: 6 }}>
+        <div className="wrap" style={{ marginTop: 6, gap: 12 }}>
           <Badge color={h.status === "in" ? "green" : ""}>
-            {h.status === "in" ? <><span className="dotmark" /> In since {fmtTime(h.lastIn)}</> : "Outside"}
+            {h.status === "in" ? `In since ${fmtTime(h.lastIn)}` : "Outside"}
           </Badge>
-          {h.biometric && <Badge color="brand"><Icons.Finger size={10} /> Biometric</Badge>}
-          {h.policeVerified && <Badge color="blue"><Icons.Shield size={10} /> Verified</Badge>}
-          <Badge color="amber"><Icons.Star size={10} /> {h.rating}</Badge>
+          {h.policeVerified && <Badge>Police verified</Badge>}
+          <span className="tiny">{h.rating} ★</span>
         </div>
       </div>
       {right}
@@ -179,14 +186,12 @@ export function IncidentRow({ i }) {
   const color = { high: "red", medium: "amber", low: "" }[i.severity];
   return (
     <div className="li">
-      <div className={`ico-tile ${i.severity === "high" ? "red" : "amber"}`}><Icons.AlertTri size={18} /></div>
       <div className="grow">
         <p className="h4" style={{ textTransform: "capitalize" }}>{i.type} · {i.involves}</p>
         <p className="tiny" style={{ marginTop: 3 }}>{i.note}</p>
-        <div className="wrap" style={{ marginTop: 6 }}>
-          <Badge color={color}>{i.severity}</Badge>
+        <div className="wrap" style={{ marginTop: 6, gap: 12 }}>
+          <Badge color={color}>{i.severity} severity</Badge>
           <Badge color={i.status === "open" ? "amber" : "green"}>{i.status}</Badge>
-          {i.recording && <Badge color="purple"><Icons.Mic size={10} /> {i.recording}</Badge>}
           <span className="tiny">{sel.userName(i.by)} · {fmtDateTime(i.at)}</span>
         </div>
       </div>
@@ -196,10 +201,10 @@ export function IncidentRow({ i }) {
 
 export const QuickAction = ({ icon: I, label, onClick, tone }) => (
   <button className="card tap" onClick={onClick}
-    style={{ display: "flex", alignItems: "center", gap: 11, marginBottom: 0, padding: "13px 12px" }}>
-    <div className={`ico-tile ${tone || ""}`}><I size={18} /></div>
-    <span style={{ fontSize: 12.5, fontWeight: 550, color: "var(--ink)", lineHeight: 1.35, whiteSpace: "pre-line", textAlign: "left" }}>
-      {label}
+    style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 0, padding: "12px 13px" }}>
+    <I size={17} style={{ color: tone === "red" ? "var(--bad)" : "var(--ink-3)", flexShrink: 0 }} />
+    <span style={{ fontSize: 13, fontWeight: 450, color: "var(--ink)", lineHeight: 1.35, textAlign: "left" }}>
+      {String(label).replace(/\n/g, " ")}
     </span>
   </button>
 );

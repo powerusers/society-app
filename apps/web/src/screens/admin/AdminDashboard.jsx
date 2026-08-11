@@ -35,7 +35,7 @@ export default function AdminDashboard({ nav }) {
 
   return (
     <>
-      <div className="card brand">
+      <div className="panel">
         <p className="sub" style={{ fontSize: 12, margin: 0 }}>Collections · {cycleLabel(cycle)}</p>
         <div className="row top" style={{ marginTop: 4 }}>
           <div>

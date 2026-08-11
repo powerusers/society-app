@@ -30,7 +30,7 @@ export default function GuardGate({ nav }) {
 
   return (
     <>
-      <div className="card brand">
+      <div className="panel">
         <div className="row top">
           <div className="grow">
             <p className="sub" style={{ fontSize: 12, margin: 0 }}>On duty</p>
@@ -38,7 +38,7 @@ export default function GuardGate({ nav }) {
             <p className="sub" style={{ fontSize: 12, margin: 0 }}>{gate.name} · {me.shift || "Day shift"}</p>
           </div>
           <div className="right">
-            <Badge className="solid">{gate.device}</Badge>
+            <span className="tiny mono">{gate.device}</span>
             <p className="sub" style={{ fontSize: 11, marginTop: 6 }}>
               <span className="blink green" style={{ display: "inline-block", marginRight: 5 }} />{gate.status}
             </p>
@@ -70,8 +70,9 @@ export default function GuardGate({ nav }) {
       </div>
 
       <div style={{ marginTop: 6 }}>
-        <Btn block variant="danger" icon={Icons.Mic} onClick={() => setSheet("incident")} style={{ marginTop: 9 }}>
-          One-click misbehaviour recording
+        <Btn block variant="outline" icon={Icons.Mic} onClick={() => setSheet("incident")}
+          style={{ marginTop: 9, color: "var(--bad)", borderColor: "var(--bad-line)" }}>
+          Record misbehaviour
         </Btn>
       </div>
 
@@ -79,9 +80,9 @@ export default function GuardGate({ nav }) {
         <>
           <div className="sect"><h2 className="h2">At the gate</h2></div>
           {waiting.map((v) => (
-            <VisitorCard key={v.id} v={v} accent="#FF9800" actions={operate && <>
+            <VisitorCard key={v.id} v={v} actions={operate && <>
               <Btn size="sm" icon={Icons.Send} onClick={() => transition(v, "pending")}>Send to flat</Btn>
-              <Btn size="sm" variant="danger" icon={Icons.X} onClick={() => transition(v, "denied")}>Deny</Btn>
+              <Btn size="sm" variant="outline" icon={Icons.X} onClick={() => transition(v, "denied")}>Deny</Btn>
             </>} />
           ))}
         </>
@@ -91,7 +92,7 @@ export default function GuardGate({ nav }) {
         <>
           <div className="sect"><h2 className="h2">Waiting on the flat</h2></div>
           {pending.map((v) => (
-            <VisitorCard key={v.id} v={v} accent="#1565C0" actions={<div className="alert warn" style={{ marginBottom: 0, width: "100%" }}>
+            <VisitorCard key={v.id} v={v} actions={<div className="alert warn" style={{ marginBottom: 0, width: "100%" }}>
               <span className="blink" />
               <span className="grow">Sent {ago(v.sentAt || v.createdAt)} — resident notified on app and smartwatch.</span>
             </div>} />
@@ -103,7 +104,7 @@ export default function GuardGate({ nav }) {
         <>
           <div className="sect"><h2 className="h2">Cleared for entry</h2></div>
           {cleared.map((v) => (
-            <VisitorCard key={v.id} v={v} accent="#43A047" actions={operate && <>
+            <VisitorCard key={v.id} v={v} actions={operate && <>
               <Btn size="sm" icon={Icons.Check} onClick={() => transition(v, "inside")}>Allow entry</Btn>
               {v.passCode && <Badge color="brand">Pass {v.passCode}</Badge>}
             </>} />
@@ -117,7 +118,7 @@ export default function GuardGate({ nav }) {
           {inside.map((v) => {
             const o = overstay(v, db.settings.overstayMins);
             return (
-              <VisitorCard key={v.id} v={v} accent={o?.over ? "#E53935" : "#43A047"} actions={operate && <>
+              <VisitorCard key={v.id} v={v} actions={operate && <>
                 <Btn size="sm" variant="ghost" icon={Icons.LogOut} onClick={() => transition(v, "exited")}>Mark exit</Btn>
                 {o?.over && (
                   <Btn size="sm" variant="danger" icon={Icons.AlertTri} onClick={() => A.raiseIncident({

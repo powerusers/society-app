@@ -32,19 +32,19 @@ export default function Payments() {
 
   return (
     <>
-      <div className={`card ${dues ? "" : "brand"}`}
-        style={dues ? { background: "var(--warn-bg)", borderColor: "var(--warn-border)" } : undefined}>
-        <div className="row top">
-          <div className="grow">
-            <p className="tiny" style={{ color: dues ? "var(--warn)" : undefined, fontWeight: 600, textTransform: "uppercase", letterSpacing: ".06em" }}>
-              {dues ? "Outstanding" : "All clear"}
-            </p>
-            <p className="h1" style={{ marginTop: 4, color: dues ? "var(--warn)" : "#fff" }}>{inr(dues)}</p>
-            {due[0] && <p className="tiny" style={{ marginTop: 5 }}>Next due {fmtDate(due[0].dueDate)} · {cycleLabel(due[0].cycle)}</p>}
-            {!dues && <p className="sub" style={{ marginTop: 5, fontSize: 12.5 }}>No pending maintenance for {me.flat}.</p>}
-          </div>
-          {due[0] && <Btn onClick={() => setPayTarget(due[0])}>Pay now</Btn>}
-        </div>
+      <div className="panel">
+        <p className="tiny">{dues ? "Outstanding" : "Nothing outstanding"}</p>
+        <p className="h1" style={{ marginTop: 6 }}>{inr(dues)}</p>
+        <p className="tiny" style={{ marginTop: 6 }}>
+          {due[0]
+            ? `${cycleLabel(due[0].cycle)} · due ${fmtDate(due[0].dueDate)}`
+            : `Every bill for ${me.flat} is settled.`}
+        </p>
+        {due[0] && (
+          <Btn variant="white" block style={{ marginTop: 14 }} onClick={() => setPayTarget(due[0])}>
+            Pay {inr(due[0].total)}
+          </Btn>
+        )}
       </div>
 
       {recent && <SettlementTracker p={recent} />}
@@ -65,7 +65,7 @@ export default function Payments() {
         </Alert>
       )}
 
-      <Alert kind="ok" icon={Icons.Zap}>
+      <Alert icon={Icons.Zap}>
         Payments settle to the society's bank account within {db.settings.settlementMins} minutes, and your flat number appears in the bank narration — so the treasurer never has to guess who paid.
       </Alert>
 

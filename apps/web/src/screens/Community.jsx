@@ -163,7 +163,7 @@ function Forum({ kinds, onNew, market }) {
               <button className="chip" onClick={(e) => { e.stopPropagation(); patch("forum", p.id, (x) => ({ likes: x.likes + 1 })); }}>
                 <Icons.Heart size={11} /> {p.likes}
               </button>
-              <span className="badge"><Icons.Chat size={11} /> {p.comments.length}</span>
+              <span className="badge bare"><Icons.Chat size={11} /> {p.comments.length}</span>
             </div>
           </div>
         </div>

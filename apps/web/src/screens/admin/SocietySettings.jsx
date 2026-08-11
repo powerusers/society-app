@@ -2,6 +2,7 @@ import { useState } from "react";
 import Icons from "../../icons";
 import { Badge, Btn, Sheet, Input, Toggle, Alert, Empty, Select } from "../../components/ui";
 import { useApp } from "../../store";
+import { ACCENTS } from "../../styles";
 import { inr } from "../../lib/format";
 
 const FEATURES = [
@@ -38,6 +39,25 @@ export default function SocietySettings() {
             <p className="tiny" style={{ marginTop: 2 }}>Reg. {s.regNo}</p>
           </div>
           <Btn size="sm" variant="ghost" icon={Icons.Edit} onClick={() => setEdit("profile")}>Edit</Btn>
+        </div>
+      </div>
+
+      <div className="sect"><h2 className="h2">Appearance</h2></div>
+      <div className="card">
+        <p className="muted" style={{ marginBottom: 12 }}>
+          The accent colour used for primary actions and the active tab. Everything
+          else in the app is neutral, so this is the only branded value.
+        </p>
+        <div className="wrap">
+          {Object.entries(ACCENTS).map(([key, a]) => (
+            <button key={key} onClick={() => { setSettings({ accent: key }); say(`Accent set to ${key}`); }}
+              aria-label={key}
+              style={{
+                width: 34, height: 34, borderRadius: "var(--r-pill)", background: a.accent,
+                border: s.accent === key ? "2px solid var(--ink)" : "2px solid transparent",
+                outline: s.accent === key ? "1px solid var(--ink)" : "none", outlineOffset: 2,
+              }} />
+          ))}
         </div>
       </div>
 

@@ -33,23 +33,15 @@ export default function Home({ nav }) {
   return (
     <>
       {/* dues / welcome */}
-      <div className="card brand">
-        <div className="row top">
-          <div className="grow">
-            <p className="sub" style={{ fontSize: 12.5, margin: 0 }}>Welcome back,</p>
-            <h2 className="h1" style={{ margin: "2px 0" }}>{me.name.split(" ")[0]}</h2>
-            <p className="sub" style={{ fontSize: 12, margin: 0 }}>Flat {flat} · {me.relation || me.role}{me.designation ? ` · ${me.designation}` : ""}</p>
-          </div>
-          <div className="right">
-            <p className="sub" style={{ fontSize: 11, margin: 0 }}>Outstanding</p>
-            <p className="num" style={{ color: "#fff" }}>{inr(dues)}</p>
-            {dueBill && <Badge className="solid" color="">Due {fmtDate(dueBill.dueDate)}</Badge>}
-          </div>
-        </div>
+      <div className="panel">
+        <p className="tiny">{dues ? "Outstanding" : "Nothing outstanding"}</p>
+        <p className="h1" style={{ marginTop: 6 }}>{inr(dues)}</p>
+        <p className="tiny" style={{ marginTop: 6 }}>
+          {dueBill ? `${cycleLabel(dueBill.cycle)} · due ${fmtDate(dueBill.dueDate)}` : `Flat ${flat} is fully paid up.`}
+        </p>
         {dueBill && (
-          <Btn variant="white" block style={{ marginTop: 14 }} icon={Icons.Rupee}
-            onClick={() => nav.switchTab("payments")}>
-            Pay {cycleLabel(dueBill.cycle)} · {inr(dueBill.total)}
+          <Btn variant="white" block style={{ marginTop: 14 }} onClick={() => nav.switchTab("payments")}>
+            Pay {inr(dueBill.total)}
           </Btn>
         )}
       </div>
@@ -62,7 +54,7 @@ export default function Home({ nav }) {
             <span className="grow"><b>{pending.length} visitor{pending.length > 1 ? "s are" : " is"} waiting at the gate</b> for your approval.</span>
           </div>
           {pending.map((v) => (
-            <VisitorCard key={v.id} v={v} accent="#FF9800"
+            <VisitorCard key={v.id} v={v}
               actions={<ApproveDeny onApprove={() => transition(v, "approved")} onDeny={() => transition(v, "denied")} />} />
           ))}
         </>

@@ -68,7 +68,7 @@ await check("session resumes from the stored refresh token", await has("Rahul"))
 
 // 3 — bills come from Postgres
 await tab("Payments");
-await check("bills loaded from the API", await has("Outstanding") || await has("All clear"));
+await check("bills loaded from the API", (await has("Outstanding")) || (await has("Nothing outstanding")));
 
 // 4 — resident issues a real gate pass
 await tab("Gate");

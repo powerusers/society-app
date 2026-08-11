@@ -41,7 +41,7 @@ export function PreApproveSheet({ onClose, flatCode }) {
 
   return (
     <Sheet title="Pre-approve a visitor" onClose={onClose}>
-      <Alert kind="ok" icon={Icons.CheckCircle}>
+      <Alert icon={Icons.CheckCircle}>
         Pre-approved visitors are let in by the guard without disturbing you. Share the QR pass and they can self check-in even at a guardless gate.
       </Alert>
       <Input label="Visitor name" placeholder="e.g. Kiran Deshpande / Swiggy" value={f.name} onChange={(e) => { u("name", e.target.value); setErr(""); }} />

@@ -44,8 +44,9 @@ await check("ticket created with SLA", await has("raised — SLA"));
 
 // 4. resident pays the open bill
 await tab("Payments");
-await check("outstanding shown", !(await has("All clear")));
-await tap("Pay now");
+await check("outstanding shown", await has("Outstanding"));
+await page.locator(".panel .btn").first().click();
+await wait();
 await page.locator(".sheet .btn.block").last().click();
 await wait(2200);
 await check("payment succeeded", await has("Payment successful"));

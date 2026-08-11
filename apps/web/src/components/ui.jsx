@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from "react";
 import Icons from "../icons";
-import { avatarColor } from "../styles";
 import { initials } from "../lib/format";
 
 export const Btn = ({ variant, size, block, icon: I, children, className = "", ...p }) => (
@@ -90,22 +89,20 @@ export const Chips = ({ value, onChange, options }) => (
   </div>
 );
 
-export const Avatar = ({ name, size, color }) => (
-  <div className={`avatar ${size === "lg" ? "lg" : ""}`} style={{ background: color || avatarColor(name) }}>
-    {initials(name)}
-  </div>
+export const Avatar = ({ name, size }) => (
+  <div className={`avatar ${size === "lg" ? "lg" : ""}`}>{initials(name)}</div>
 );
 
 /** Emoji belongs to illustrative content (an amenity, a service), never to structure. */
 export const EmojiTile = ({ children, size }) => (
-  <div className="ico-tile plain" style={size === "lg" ? { width: 44, height: 44, fontSize: 21, borderRadius: "var(--r-md)" } : undefined}>
-    {children}
-  </div>
+  <div className="ico-tile" style={size === "lg" ? { fontSize: 20 } : undefined}>{children}</div>
 );
 
-export const Stat = ({ value, label, color, onClick }) => (
+/* `color` is accepted for call-site compatibility but ignored: a row of metrics
+   in five different colours is noise. Emphasis comes from size and order. */
+export const Stat = ({ value, label, onClick }) => (
   <div className="stat" onClick={onClick} style={onClick ? { cursor: "pointer" } : undefined}>
-    <p className="num" style={{ color: color || "var(--ink)" }}>{value}</p>
+    <p className="num">{value}</p>
     <p className="lbl">{label}</p>
   </div>
 );
@@ -118,12 +115,10 @@ export const Alert = ({ kind = "info", icon: I = Icons.Info, children }) => (
 );
 
 export const Empty = ({ icon: I = Icons.Box, title, note, action }) => (
-  <div className="card empty">
-    <div className="ico-tile plain" style={{ width: 44, height: 44, margin: "0 auto 12px", borderRadius: "var(--r-md)" }}>
-      <I size={20} />
-    </div>
+  <div className="empty">
+    <I size={20} style={{ color: "var(--n300)", marginBottom: 10 }} />
     <p className="h4">{title}</p>
-    {note && <p className="tiny" style={{ marginTop: 5, maxWidth: 280, marginInline: "auto" }}>{note}</p>}
+    {note && <p className="tiny" style={{ marginTop: 5, maxWidth: 270, marginInline: "auto" }}>{note}</p>}
     {action && <div style={{ marginTop: 16 }}>{action}</div>}
   </div>
 );

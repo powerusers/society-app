@@ -57,11 +57,11 @@ export default function Visitors({ nav }) {
       {!loading && tab === "live" && (
         <>
           {pending.map((v) => (
-            <VisitorCard key={v.id} v={v} accent="var(--warn)"
+            <VisitorCard key={v.id} v={v}
               actions={<ApproveDeny onApprove={() => transition(v, "approved")} onDeny={() => setDeny(v)} />} />
           ))}
           {inside.map((v) => (
-            <VisitorCard key={v.id} v={v} accent="var(--ok)"
+            <VisitorCard key={v.id} v={v}
               actions={can("gate.operate")
                 ? <Btn size="sm" variant="ghost" icon={Icons.LogOut} onClick={() => transition(v, "exited")}>Mark exit</Btn>
                 : null} />
@@ -76,7 +76,7 @@ export default function Visitors({ nav }) {
       {!loading && tab === "expected" && (
         <>
           {upcoming.map((v) => (
-            <VisitorCard key={v.id} v={v} accent="var(--info)"
+            <VisitorCard key={v.id} v={v}
               actions={<>
                 {v.passCode && <Btn size="sm" variant="ghost" icon={Icons.QR} onClick={() => setSheet(v)}>Show pass</Btn>}
                 <Btn size="sm" variant="outline" icon={Icons.X} onClick={() => setDeny(v)}>Cancel</Btn>
