@@ -21,7 +21,11 @@ export const config = {
      value pasted into a dashboard usually does — so normalise rather than
      refuse every request over a character nobody can see. */
   corsOrigins: (process.env.CORS_ORIGIN || "http://localhost:3000,http://127.0.0.1:3000")
-    .split(",").map((s) => s.trim().replace(/\/+$/, "")).filter(Boolean),
+    .split(",")
+    // Quotes are shell syntax, not part of a URL, but a dashboard field keeps
+    // them verbatim and the mismatch is invisible in the UI.
+    .map((s) => s.trim().replace(/^["']|["']$/g, "").trim().replace(/\/+$/, ""))
+    .filter(Boolean),
   logLevel: process.env.LOG_LEVEL || (isProd ? "info" : "debug"),
 };
 

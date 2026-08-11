@@ -16,6 +16,14 @@ if (!storageConfigured()) {
   console.warn("[api] S3_BUCKET is not set — document upload and download will return 503");
 }
 
+/* Print the parsed allow-list, not the raw variable. A CORS failure is
+   otherwise indistinguishable from a variable that was set on the wrong
+   service, never redeployed, or pasted with quotes around it — and the
+   browser reports every one of those as the same opaque network error. */
+console.log(
+  `[api] CORS allows: ${config.corsOrigins.map((o) => JSON.stringify(o)).join(", ") || "(nothing — every browser request will be refused)"}`,
+);
+
 const server = app.listen(config.port, () => {
   console.log(`[api] listening on :${config.port} (${config.env})`);
 });
