@@ -8,19 +8,67 @@ The feature set is built to match what NoBrokerHood and MyGate offer — see
 AGM comparison deck, including what is genuinely done and what still needs
 backend or hardware work.
 
+## Layout
+
+```
+apps/
+  web/        React SPA — the resident, guard and committee app
+  api/        Express + Postgres API (see apps/api/README.md)
+packages/
+  shared/     capability matrix, bill calculation, validation schemas
+```
+
+`packages/shared` is the point of the monorepo: the authorization table, the
+bill calculator and the request schemas are imported by both halves, so the
+rules cannot drift apart. The web app's checks decide what to render; the API
+re-checks everything for real.
+
 ## Running it
 
 ```bash
 npm install
-npm run dev        # http://localhost:3000
-npm run build      # production bundle into dist/
-npm run preview    # serve the built bundle
+npm run dev:web    # http://localhost:3000
+npm run build      # production bundle into apps/web/dist
+
+# API — needs Postgres, and S3 for the document vault
+cp apps/api/.env.example apps/api/.env
+createdb gvs_dev && npm run migrate && npm run seed
+npm run dev:api    # http://localhost:4000
 ```
+
+Documents are stored in S3 and never pass through the API server: the browser
+uploads with a presigned POST and downloads with a short-lived presigned GET.
+Without `S3_BUCKET` set the API still runs — only the document endpoints return
+503. See [apps/api/README.md](./apps/api/README.md) for the bucket and IAM setup.
+
+Online payment collection is deliberately out of scope for this phase. Recording
+a receipt against a bill works; a gateway is phase 2.
+
+## Two modes
+
+The web app runs against the API when `VITE_API_URL` is set, and falls back to
+its seeded local store when it is not — so the demo build still works with no
+server at all. `isLive()` in `src/lib/api.js` is the only thing that decides,
+and the repository hooks in `src/data` are the only place that branches. Screens
+call a hook and never learn which mode they are in.
+
+```bash
+VITE_API_URL=http://localhost:4000 npm run build   # live
+npm run build                                      # demo, no server needed
+```
+
+Migrated to the API: authentication and session, the gate lifecycle, bills and
+payments, the billing run with maker-checker, the helpdesk, and the document
+vault. Still on the local store because they have no endpoints yet: notices,
+polls, amenities, the forum, incidents, patrols, daily help, vehicles, and the
+ledger and reports screens.
 
 ## Signing in
 
-The login screen has one-tap demo access for each role. Every role sees a
-different app — different tabs, different permissions:
+In demo mode the login screen offers one-tap access for each role; in live mode
+those shortcuts are hidden and you sign in with real credentials (the seeded
+accounts are listed in [apps/api/README.md](./apps/api/README.md)). Every role
+sees a different app — different tabs, different permissions:
 
 | Demo user | Role | What they get |
 |---|---|---|
@@ -30,23 +78,27 @@ different app — different tabs, different permissions:
 | Mohan Singh · Main Gate | guard | Gate console, staff check-in, patrolling, gate log, incidents |
 | Ganesh Rane · Manager | staff | Ticket queue, staff register, gate view |
 
-Data is seeded on first load (150 flats, three billing cycles, a day of gate
-traffic) and persisted to `localStorage`. **More → Reset demo data** rebuilds it.
+In demo mode the data is seeded on first load (150 flats, three billing cycles,
+a day of gate traffic) and persisted to `localStorage`; **More → Reset demo
+data** rebuilds it. In live mode it comes from Postgres.
 
-## Architecture
+## Web app architecture
 
 ```
-src/
+apps/web/src/
   App.jsx              app shell: header, bottom tabs, screen stack, SOS overlay
   styles.js            design tokens + the whole stylesheet (class-based, no CSS-in-JS runtime)
   icons.jsx            single-stroke SVG icon set
   lib/
+    api.js             fetch client, token storage, single-flight refresh, S3 upload
+    query.js           useQuery / useMutation — loading, error, refetch
     format.js          currency, dates, SLA clocks, CSV export helpers
     qr.jsx             QR rendering for gate passes, staff cards, checkpoints
+  data/                repository hooks — the only place that knows about live vs demo
   store/
-    index.jsx          context provider, persistence, role capability matrix, selectors
+    index.jsx          context provider, session (both modes), persistence, selectors
     seed.js            deterministic demo society
-    actions.js         domain operations shared across screens
+    actions.js         local-store operations, used by screens with no endpoint yet
   components/
     ui.jsx             buttons, inputs, sheets, badges, stats, toasts
     entities.jsx       visitor / notice / ticket / bill / staff cards
@@ -57,24 +109,40 @@ src/
 Two conventions worth knowing before editing:
 
 - **Permissions go through `can()`**, never through role string comparisons.
-  The capability matrix lives at the top of `src/store/index.jsx`; adding a role
-  is a one-line change there.
-- **Writes go through `useActions()`** where the operation touches more than one
-  collection or needs an audit entry (approving a visitor, paying a bill,
-  approving a billing run). Simple single-collection edits use `add`/`patch`/
-  `remove` from the store directly.
+  The capability matrix lives in `packages/shared/src/capabilities.js` and is
+  shared with the API; adding a role is a one-line change there.
+- **Migrated resources go through `src/data`**, never through `api.js` or the
+  local store directly. A screen calls `useVisitors()` and gets the same shape in
+  both modes; adding a branch inside a screen is how the two modes start to
+  drift.
+- **Screens still on the local store use `useActions()`** for anything touching
+  more than one collection, and `add`/`patch`/`remove` for simple edits.
 
 ## Tests
 
-End-to-end scripts drive a real browser. They are not wired into `package.json`
-so that deploys do not pull a browser binary:
+`npm test` runs the shared unit tests and the API integration tests — the latter
+need Postgres and a `gvs_test` database. The browser end-to-end scripts stay out
+of `package.json` so deploys do not pull a browser binary:
 
 ```bash
+npm test                                # shared unit tests + API integration tests
+
 npm i -D playwright && npx playwright install chromium
-npm run preview &                       # scripts default to http://127.0.0.1:4174
-node scripts/smoke.mjs                  # renders all 31 screens across 5 roles, fails on any console/page error
-node scripts/flows.mjs                  # drives the real workflows and asserts outcomes
+npm run dev:web &                       # scripts default to http://127.0.0.1:4174
+node apps/web/scripts/smoke.mjs         # renders all 31 screens across 5 roles, fails on any console/page error
+node apps/web/scripts/flows.mjs         # drives the workflows against the seeded local store
+
+# and against the real stack: Postgres + API + S3 + a live-mode build
+npm run dev:s3 & npm run dev:api &
+VITE_API_URL=http://127.0.0.1:4000 npm run build && npx vite preview --port 4300 --outDir apps/web/dist &
+API_URL=http://127.0.0.1:4000 URL=http://127.0.0.1:4300 node apps/web/scripts/live.mjs
 ```
+
+`live.mjs` asserts nothing that is not an HTTP round trip: a wrong password
+refused by the server, a session resumed from a stored refresh token, a gate
+pass issued by a resident and scanned by the guard, the server refusing a
+visitor raised for someone else's flat, a billing run the maker cannot approve
+and a second officer can, and a document that really lands in the bucket.
 
 `flows.mjs` covers the paths that span roles: a resident approves a gate request,
 issues a QR pass and pays a bill; the guard scans that same pass and admits the
@@ -86,5 +154,14 @@ point at a different server.
 
 ## Deployment
 
-Railway via Nixpacks — `npm install && npm run build`, then `npx serve dist`.
-Config lives in `nixpacks.toml` and `railway.json`.
+Two Railway services from this one repo, both building from the repo root so the
+workspace resolves. Set each service's config-as-code path in the Railway
+dashboard — `apps/web/railway.json` and `apps/api/railway.json` — and leave the
+root directory at `/`. Link a Postgres service to the API; it injects
+`DATABASE_URL`, and migrations run at boot so a deploy never serves traffic
+against an older schema than the code expects.
+
+Set `VITE_API_URL` on the **web** service to the API's public URL — it is read at
+build time, so changing it needs a rebuild, and leaving it unset ships the demo
+build. Set `CORS_ORIGIN` on the **api** service to the web app's origin, and add
+the same origin to the S3 bucket's CORS rule.

@@ -55,18 +55,30 @@ resident marketplace and discussion forum; a masked resident directory; a
 document vault; amenity **and** class bookings with committee approval for
 high-value slots; an SOS panic flow that broadcasts to every gate.
 
+The document vault is the one piece with a real backend behind it already: files
+live in S3, uploaded and downloaded through short-lived presigned URLs so bytes
+never pass through the API server. The web screen is not wired to it yet.
+
 ---
 
 ## What is genuinely not done
 
-The app is a complete frontend against seeded local data. To run a real society
-on it, these need building:
+The web app is a complete frontend against seeded local data. A backend now
+exists alongside it (`apps/api`) with real auth and server-enforced
+authorization, but the two are not connected yet. To run a real society on this,
+these need building:
 
-1. **Backend and real auth** — the data lives in `localStorage`, so it is
-   per-device and there is no password check. Needs an API, a database and
-   session management.
-2. **Payment gateway** — the payment flow is modelled end to end but calls no
-   gateway, and no money moves.
+1. **Wiring the web app to the API** — screens still read and write
+   `localStorage`. The API covers auth, the gate lifecycle, billing with
+   maker-checker, the helpdesk and the document vault; those screens migrate
+   first. Notices, polls, amenities and the incident/patrol writes have no
+   endpoints yet.
+2. **Online payment collection — deferred to phase 2 by decision.** Receipt
+   recording works today: a payment writes a receipt, a flat-wise bank narration
+   and a ledger entry in one transaction, which covers cheques, cash and NEFT
+   credits booked by the treasurer. Gateway checkout, webhook confirmation and
+   real settlement timing are phase 2. Until then the settlement time shown is
+   computed from the society's configured window, not reported by a processor.
 3. **Push notifications** — approvals currently surface in-app only; gate
    requests need real push to be useful.
 4. **Hardware** — biometric readers, plate recognition, boom barriers and the
@@ -74,7 +86,6 @@ on it, these need building:
 5. **Telephony** — for the AI voice helpdesk.
 6. **Bank feed** — the MT940 import parses a real statement format, but a live
    feed has to be arranged with the bank.
-7. **File storage** — uploaded documents are recorded as metadata, not stored.
 
 The commercial gap in the deck — ₹5.73 lakh over ten years — is a vendor pricing
 question, not a feature question, and nothing here changes it.
