@@ -50,17 +50,42 @@ await page.locator(".field", { hasText: "Full name" }).first().locator("input").
 await fill("Email", "nikhil@sunrise.in");
 await fill("Mobile", "9876543210");
 await fill("Password", "a-properly-long-passphrase");
-await fill("Token", "not-the-right-token");
+await fill("Code", "ZZZZ-ZZZZ-ZZZZ");
 await tap("Create society and sign in");
 await wait(1400);
-await check("a wrong setup token is refused by the server", await has("setup token is not correct"));
+await check("an invite code that does not exist is refused", await has("not valid"));
 
-// 3 — with the real token the society exists and the admin is signed in
-await fill("Token", TOKEN);
+/* 3 — a real invite, issued the way an operator would, pinned to this society
+   and this secretary. The browser only ever sees the code. */
+const invite = await page.evaluate(async ({ api, token }) => {
+  const res = await fetch(`${api}/api/setup/invites`, {
+    method: "POST",
+    headers: { "content-type": "application/json", "x-setup-token": token },
+    body: JSON.stringify({ label: "e2e", societyName: "Sunrise Residency", email: "nikhil@sunrise.in", days: 7 }),
+  });
+  return (await res.json()).invite;
+}, { api: API, token: TOKEN });
+await check("the operator can issue an invite code", /^[A-Z2-9]{4}-[A-Z2-9]{4}-[A-Z2-9]{4}$/.test(invite.code || ""));
+
+await fill("Code", invite.code);
 await tap("Create society and sign in");
 await page.waitForSelector(".nav", { timeout: 15000 });
 await wait(900);
-await check("setup signs the new administrator straight in", await has("Nikhil"));
+await check("redeeming the invite signs the new administrator straight in", await has("Nikhil"));
+
+// 3b — that code is now spent
+const reuse = await page.evaluate(async ({ api, code }) => {
+  const res = await fetch(`${api}/api/setup`, {
+    method: "POST",
+    headers: { "content-type": "application/json", "x-setup-token": code },
+    body: JSON.stringify({
+      society: { name: "Second Attempt", address: "", regNo: "", gstin: "" },
+      admin: { name: "Someone Else", email: "else@sunrise.in", password: "a-properly-long-passphrase" },
+    }),
+  });
+  return { status: res.status, message: (await res.json())?.error?.message || "" };
+}, { api: API, code: invite.code });
+await check("the same code cannot create a second society", reuse.status === 403 && /already been used/i.test(reuse.message));
 
 // 4 — the society is now listed for applicants, and its register is empty
 const listed = await page.evaluate(async (api) => (await (await fetch(`${api}/api/setup/societies`)).json()).societies, API);

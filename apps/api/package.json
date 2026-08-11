@@ -10,6 +10,7 @@
     "migrate": "node src/db/migrate.js up",
     "migrate:status": "node src/db/migrate.js status",
     "seed": "node src/db/seed.js",
+    "invite": "node scripts/invite.mjs",
     "test": "node --test --test-concurrency=1 test/*.test.js",
     "dev:s3": "node scripts/dev-s3.mjs"
   },
