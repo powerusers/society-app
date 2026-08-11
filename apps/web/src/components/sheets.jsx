@@ -4,31 +4,39 @@ import { Sheet, Btn, Input, Select, TextArea, Alert, Badge, Segmented } from "./
 import QR from "../lib/qr";
 import { useApp } from "../store";
 import { useActions } from "../store/actions";
+import { useVisitors } from "../data/visitors";
+import { useTickets } from "../data/tickets";
+import { useGates } from "../data/gates";
 import { fmtDate, dayKey } from "../lib/format";
 import { CAT } from "./entities";
 
 /** Resident pre-approves a visitor and gets a shareable QR gate pass. */
 export function PreApproveSheet({ onClose, flatCode }) {
   const { db, me } = useApp();
-  const A = useActions();
+  const { create } = useVisitors();
+  const { gates, defaultGateId } = useGates();
   const [pass, setPass] = useState(null);
+  const [busy, setBusy] = useState(false);
   const [f, setF] = useState({
     name: "", category: "guest", date: dayKey(), slot: "any", purpose: "", phone: "",
-    recurring: "once", vehicle: "", gateId: "gate_main",
+    recurring: "once", vehicle: "",
   });
   const u = (k, v) => setF((p) => ({ ...p, [k]: v }));
   const [err, setErr] = useState("");
 
   if (pass) return <GatePassSheet visitor={pass} onClose={onClose} />;
 
-  const submit = () => {
+  const submit = async () => {
     if (!f.name.trim()) return setErr("Enter the visitor's name");
-    const v = A.preApprove({
+    setBusy(true);
+    const res = await create({
       name: f.name.trim(), category: f.category, flatCode: flatCode || me.flat,
-      purpose: f.purpose, phone: f.phone, vehicle: f.vehicle, gateId: f.gateId,
-      expectedAt: `${f.date}T09:00:00.000Z`, recurring: f.recurring,
+      status: "pre-approved", purpose: f.purpose, phone: f.phone, vehicle: f.vehicle,
+      gateId: f.gateId || defaultGateId || undefined, expectedAt: new Date(`${f.date}T09:00:00Z`).toISOString(), recurring: f.recurring,
     });
-    setPass(v);
+    setBusy(false);
+    if (!res.ok) return setErr(res.error?.message || "Could not create the pass");
+    setPass(res.visitor);
   };
 
   return (
@@ -46,13 +54,13 @@ export function PreApproveSheet({ onClose, flatCode }) {
             options={[{ value: "once", label: "One time" }, { value: "daily", label: "Every day" }, { value: "weekdays", label: "Mon–Fri" }, { value: "weekly", label: "Weekly" }]} />
         </div>
       </div>
-      <Select label="Entry gate" value={f.gateId} onChange={(e) => u("gateId", e.target.value)}
-        options={db.gates.map((g) => ({ value: g.id, label: g.name }))} />
+      <Select label="Entry gate" value={f.gateId ?? defaultGateId ?? ""} onChange={(e) => u("gateId", e.target.value)}
+        options={gates.map((g) => ({ value: g.id, label: g.name }))} />
       <Input label="Visitor mobile (optional)" type="tel" value={f.phone} onChange={(e) => u("phone", e.target.value)} placeholder="For pass delivery over SMS" />
       <Input label="Vehicle number (optional)" value={f.vehicle} onChange={(e) => u("vehicle", e.target.value)} placeholder="MH-12-AB-1234" />
       <Input label="Purpose" value={f.purpose} onChange={(e) => u("purpose", e.target.value)} placeholder="e.g. Dinner, furniture delivery" />
       {err && <p className="err" style={{ marginBottom: 10 }}>{err}</p>}
-      <Btn block icon={Icons.QR} onClick={submit}>Create gate pass</Btn>
+      <Btn block icon={Icons.QR} onClick={submit} disabled={busy}>{busy ? "Creating…" : "Create gate pass"}</Btn>
     </Sheet>
   );
 }
@@ -92,7 +100,8 @@ export function GatePassSheet({ visitor, onClose }) {
 
 export function RaiseTicketSheet({ onClose, defaultCategory }) {
   const { db, me } = useApp();
-  const A = useActions();
+  const { create } = useTickets();
+  const [busy, setBusy] = useState(false);
   const [f, setF] = useState({ category: defaultCategory || "Plumbing", title: "", body: "", priority: "medium", source: "app" });
   const u = (k, v) => setF((p) => ({ ...p, [k]: v }));
   const [err, setErr] = useState("");
@@ -110,11 +119,14 @@ export function RaiseTicketSheet({ onClose, defaultCategory }) {
           { value: "low", label: `Low — ${db.settings.slaHours.low}h SLA` },
         ]} />
       {err && <p className="err" style={{ marginBottom: 10 }}>{err}</p>}
-      <Btn block icon={Icons.Send} onClick={() => {
+      <Btn block icon={Icons.Send} disabled={busy} onClick={async () => {
         if (!f.title.trim()) return setErr("Add a short subject");
-        A.raiseTicket({ ...f, flatCode: me.flat });
+        setBusy(true);
+        const res = await create({ ...f, flatCode: me.flat });
+        setBusy(false);
+        if (!res.ok) return setErr(res.error?.message || "Could not raise the ticket");
         onClose();
-      }}>Submit ticket</Btn>
+      }}>{busy ? "Submitting…" : "Submit ticket"}</Btn>
       <p className="hint" style={{ textAlign: "center", marginTop: 10 }}>
         Prefer calling? The AI voice helpdesk creates a ticket automatically from your call.
       </p>

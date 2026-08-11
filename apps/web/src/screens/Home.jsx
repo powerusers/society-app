@@ -5,19 +5,21 @@ import { NoticeCard, VisitorCard, ApproveDeny, QuickAction, OverstayPill, HelpRo
 import { PreApproveSheet, RaiseTicketSheet } from "../components/sheets";
 import { useApp } from "../store";
 import { useActions } from "../store/actions";
+import { useVisitors } from "../data/visitors";
+import { useMyBills } from "../data/bills";
 import { inr, lakh, cycleLabel, fmtDate, pct, thisCycle, fmtTime } from "../lib/format";
 
 export default function Home({ nav }) {
   const { db, me, can, sel } = useApp();
   const A = useActions();
+  const { visitors, transition } = useVisitors();
+  const { bills, dues } = useMyBills();
   const [sheet, setSheet] = useState(null);
 
   const flat = me.flat;
-  const bills = sel.billsOf(flat);
   const dueBill = bills.find((b) => b.status !== "paid");
-  const dues = sel.duesOf(flat);
-  const pending = db.visitors.filter((v) => v.status === "pending" && v.flatCode === flat);
-  const inside = db.visitors.filter((v) => v.status === "inside" && v.flatCode === flat);
+  const pending = visitors.filter((v) => v.status === "pending" && v.flatCode === flat);
+  const inside = visitors.filter((v) => v.status === "inside" && v.flatCode === flat);
   const help = sel.helpOf(flat);
   const helpIn = help.filter((h) => h.status === "in");
   const myTickets = db.tickets.filter((t) => t.flatCode === flat && t.status !== "closed");
@@ -61,7 +63,7 @@ export default function Home({ nav }) {
           </div>
           {pending.map((v) => (
             <VisitorCard key={v.id} v={v} accent="#FF9800"
-              actions={<ApproveDeny onApprove={() => A.approveVisitor(v)} onDeny={() => A.denyVisitor(v)} />} />
+              actions={<ApproveDeny onApprove={() => transition(v, "approved")} onDeny={() => transition(v, "denied")} />} />
           ))}
         </>
       )}

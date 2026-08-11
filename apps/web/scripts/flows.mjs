@@ -46,7 +46,7 @@ await check("ticket created with SLA", await has("raised — SLA"));
 await tab("Payments");
 await check("outstanding shown", !(await has("All clear")));
 await tap("Pay now");
-await page.locator(".sheet").getByText("securely", { exact: false }).click();
+await page.locator(".sheet .btn.block").last().click();
 await wait(2200);
 await check("payment succeeded", await has("Payment successful"));
 await check("receipt number issued", await has("RCT-"));

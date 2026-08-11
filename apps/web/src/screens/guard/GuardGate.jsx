@@ -5,20 +5,26 @@ import { VisitorCard, overstay, CAT, catOf } from "../../components/entities";
 import QR from "../../lib/qr";
 import { useApp } from "../../store";
 import { useActions } from "../../store/actions";
+import { useVisitors } from "../../data/visitors";
+import { useGates } from "../../data/gates";
 import { fmtTime, ago } from "../../lib/format";
 
 export default function GuardGate({ nav }) {
   const { db, me, can } = useApp();
   const A = useActions();
-  const [gateId, setGateId] = useState(me.gate || "gate_main");
+  const { visitors: allVisitors, loading, error, refetch, transition } = useVisitors();
+  const { gates, defaultGateId } = useGates();
+  const [pickedGate, setPickedGate] = useState(null);
+  const gateId = pickedGate || defaultGateId;
+  const setGateId = setPickedGate;
   const [sheet, setSheet] = useState(null);
 
-  const gate = db.gates.find((g) => g.id === gateId) || db.gates[0];
+  const gate = gates.find((g) => g.id === gateId) || gates[0] || { name: "Gate", device: "", status: "online" };
   const at = (v) => v.gateId === gateId;
-  const waiting = db.visitors.filter((v) => v.status === "waiting" && at(v));
-  const pending = db.visitors.filter((v) => v.status === "pending" && at(v));
-  const cleared = db.visitors.filter((v) => (v.status === "approved" || v.status === "pre-approved") && at(v));
-  const inside = db.visitors.filter((v) => v.status === "inside" && at(v));
+  const waiting = allVisitors.filter((v) => v.status === "waiting" && at(v));
+  const pending = allVisitors.filter((v) => v.status === "pending" && at(v));
+  const cleared = allVisitors.filter((v) => (v.status === "approved" || v.status === "pre-approved") && at(v));
+  const inside = allVisitors.filter((v) => v.status === "inside" && at(v));
   const alarms = inside.filter((v) => overstay(v, db.settings.overstayMins)?.over);
   const operate = can("gate.operate");
 
@@ -40,7 +46,7 @@ export default function GuardGate({ nav }) {
         </div>
       </div>
 
-      <Chips value={gateId} onChange={setGateId} options={db.gates.map((g) => ({ value: g.id, label: g.name }))} />
+      <Chips value={gateId} onChange={setGateId} options={gates.map((g) => ({ value: g.id, label: g.name }))} />
 
       <div className="grid3">
         <Stat value={waiting.length} label="At gate" color="var(--amber)" />
@@ -74,8 +80,8 @@ export default function GuardGate({ nav }) {
           <div className="sect"><h2 className="h2">At the gate</h2></div>
           {waiting.map((v) => (
             <VisitorCard key={v.id} v={v} accent="#FF9800" actions={operate && <>
-              <Btn size="sm" icon={Icons.Send} onClick={() => A.sendToFlat(v)}>Send to flat</Btn>
-              <Btn size="sm" variant="danger" icon={Icons.X} onClick={() => A.denyVisitor(v)}>Deny</Btn>
+              <Btn size="sm" icon={Icons.Send} onClick={() => transition(v, "pending")}>Send to flat</Btn>
+              <Btn size="sm" variant="danger" icon={Icons.X} onClick={() => transition(v, "denied")}>Deny</Btn>
             </>} />
           ))}
         </>
@@ -98,7 +104,7 @@ export default function GuardGate({ nav }) {
           <div className="sect"><h2 className="h2">Cleared for entry</h2></div>
           {cleared.map((v) => (
             <VisitorCard key={v.id} v={v} accent="#43A047" actions={operate && <>
-              <Btn size="sm" icon={Icons.Check} onClick={() => A.admitVisitor(v)}>Allow entry</Btn>
+              <Btn size="sm" icon={Icons.Check} onClick={() => transition(v, "inside")}>Allow entry</Btn>
               {v.passCode && <Badge color="brand">Pass {v.passCode}</Badge>}
             </>} />
           ))}
@@ -112,7 +118,7 @@ export default function GuardGate({ nav }) {
             const o = overstay(v, db.settings.overstayMins);
             return (
               <VisitorCard key={v.id} v={v} accent={o?.over ? "#E53935" : "#43A047"} actions={operate && <>
-                <Btn size="sm" variant="ghost" icon={Icons.LogOut} onClick={() => A.exitVisitor(v)}>Mark exit</Btn>
+                <Btn size="sm" variant="ghost" icon={Icons.LogOut} onClick={() => transition(v, "exited")}>Mark exit</Btn>
                 {o?.over && (
                   <Btn size="sm" variant="danger" icon={Icons.AlertTri} onClick={() => A.raiseIncident({
                     type: "overstay", severity: "medium", gateId, involves: `${v.name} · ${v.flatCode}`,
@@ -137,7 +143,9 @@ export default function GuardGate({ nav }) {
 }
 
 function EntrySheet({ gateId, onClose }) {
-  const { db, me, add, say } = useApp();
+  const { db, me } = useApp();
+  const { create } = useVisitors();
+  const [busy, setBusy] = useState(false);
   const [f, setF] = useState({ name: "", category: "guest", flatCode: db.flats[0].code, phone: "", purpose: "", vehicle: "", photo: false });
   const u = (k, v) => setF((p) => ({ ...p, [k]: v }));
   const [err, setErr] = useState("");
@@ -158,33 +166,37 @@ function EntrySheet({ gateId, onClose }) {
       <Input label="Vehicle number" value={f.vehicle} onChange={(e) => u("vehicle", e.target.value)} placeholder="Optional — ANPR auto-fills at the main gate" />
       <Input label="Purpose" value={f.purpose} onChange={(e) => u("purpose", e.target.value)} placeholder="e.g. Package delivery" />
       {err && <p className="err" style={{ marginBottom: 10 }}>{err}</p>}
-      <Btn block icon={Icons.Plus} onClick={() => {
+      <Btn block icon={Icons.Plus} disabled={busy} onClick={async () => {
         if (!f.name.trim()) return setErr("Enter the visitor's name");
-        add("visitors", {
-          ...f, name: f.name.trim(), gateId, status: "waiting", raisedBy: `Guard · ${me.name}`,
-          createdAt: new Date().toISOString(),
+        setBusy(true);
+        const res = await create({
+          name: f.name.trim(), category: f.category, flatCode: f.flatCode, phone: f.phone,
+          vehicle: f.vehicle, purpose: f.purpose, gateId, status: "waiting",
           allowedMins: f.category === "delivery" ? db.settings.overstayMins : 240,
         });
-        say("Entry recorded — send it to the flat.");
+        setBusy(false);
+        if (!res.ok) return setErr(res.error?.message || "Could not record the entry");
         onClose();
-      }}>Record entry</Btn>
+      }}>{busy ? "Recording…" : "Record entry"}</Btn>
     </Sheet>
   );
 }
 
 /** Stands in for the device camera: type or paste the 6-character pass code. */
 function ScanSheet({ gateId, onClose }) {
-  const { db, say } = useApp();
-  const A = useActions();
+  const { db } = useApp();
+  const { verifyPass, transition } = useVisitors();
   const [code, setCode] = useState("");
   const [found, setFound] = useState(null);
   const [err, setErr] = useState("");
+  const [busy, setBusy] = useState(false);
 
-  const check = () => {
-    const v = db.visitors.find((x) => x.passCode?.toUpperCase() === code.trim().toUpperCase());
-    if (!v) return setErr("No matching gate pass. Ask the visitor to re-share it.");
-    if (v.status === "exited" || v.status === "denied") return setErr("This pass has already been used or cancelled.");
-    setErr(""); setFound(v);
+  const check = async () => {
+    setBusy(true);
+    const res = await verifyPass(code);
+    setBusy(false);
+    if (!res.ok) return setErr(res.error?.message || "That pass could not be verified");
+    setErr(""); setFound(res.visitor);
   };
 
   return (
@@ -198,7 +210,7 @@ function ScanSheet({ gateId, onClose }) {
           <Input label="Pass code" value={code} maxLength={6} placeholder="e.g. K4M9TP"
             onChange={(e) => { setCode(e.target.value.toUpperCase()); setErr(""); }} />
           {err && <p className="err" style={{ marginBottom: 10 }}>{err}</p>}
-          <Btn block icon={Icons.Check} onClick={check}>Verify pass</Btn>
+          <Btn block icon={Icons.Check} onClick={check} disabled={busy}>{busy ? "Checking…" : "Verify pass"}</Btn>
         </>
       ) : (
         <>
@@ -212,7 +224,7 @@ function ScanSheet({ gateId, onClose }) {
             <div className="hairline" />
             <div className="row"><span className="muted">In-building limit</span><b>{found.allowedMins || db.settings.overstayMins} min</b></div>
           </div>
-          <Btn block icon={Icons.Check} onClick={() => { A.admitVisitor(found); onClose(); }}>Allow entry & start timer</Btn>
+          <Btn block icon={Icons.Check} onClick={async () => { await transition(found, "inside"); onClose(); }}>Allow entry & start timer</Btn>
         </>
       )}
     </Sheet>

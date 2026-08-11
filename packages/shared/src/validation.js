@@ -36,7 +36,7 @@ export const createVisitorSchema = z.object({
   name: z.string().trim().min(1).max(120),
   category: z.enum(VISITOR_CATEGORIES),
   flatCode,
-  gateId: z.string().min(1).optional(),
+  gateId: z.string().uuid("Unknown gate").optional(),
   purpose: z.string().max(240).optional().default(""),
   phone: z.string().max(15).optional().default(""),
   vehicle: z.string().max(20).optional().default(""),

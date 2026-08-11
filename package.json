@@ -13,7 +13,8 @@
     "build": "npm run build --workspace @gvs/web",
     "test": "npm run test --workspaces --if-present",
     "migrate": "npm run migrate --workspace @gvs/api",
-    "seed": "npm run seed --workspace @gvs/api"
+    "seed": "npm run seed --workspace @gvs/api",
+    "dev:s3": "npm run dev:s3 --workspace @gvs/api"
   },
   "engines": {
     "node": ">=20"

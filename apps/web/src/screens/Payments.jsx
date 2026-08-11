@@ -1,9 +1,9 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Icons from "../icons";
-import { Badge, Btn, Empty, Sheet, Segmented, Alert, Stat, useTick } from "../components/ui";
+import { Badge, Btn, Empty, Sheet, Segmented, Alert, Stat, useTick, SkeletonList } from "../components/ui";
 import { BillRow } from "../components/entities";
 import { useApp } from "../store";
-import { useActions } from "../store/actions";
+import { useMyBills } from "../data/bills";
 import { inr, cycleLabel, fmtDate, fmtDateTime, until, csv, download, minsBetween } from "../lib/format";
 
 const MODES = [
@@ -14,53 +14,56 @@ const MODES = [
 ];
 
 export default function Payments() {
-  const { db, me, sel } = useApp();
+  const { db, me, live } = useApp();
+  const { bills, loading, error, refetch, pay, paymentFor, dues } = useMyBills();
   const [tab, setTab] = useState("due");
   const [open, setOpen] = useState(null);
-  const [pay, setPay] = useState(null);
+  const [payTarget, setPayTarget] = useState(null);
+  const [recent, setRecent] = useState(null);
 
-  const flat = me.flat;
-  const bills = sel.billsOf(flat);
   const due = bills.filter((b) => b.status !== "paid");
   const paid = bills.filter((b) => b.status === "paid");
-  const dues = due.reduce((s, b) => s + b.total, 0);
-  const myPayments = db.payments.filter((p) => p.flatCode === flat).sort((a, b) => (a.paidAt < b.paidAt ? 1 : -1));
-  const settling = myPayments.filter((p) => new Date(p.settledAt) > new Date());
 
-  const exportLedger = () => {
-    const head = ["Cycle", "Bill", "Amount", "Status", "Due date", "Paid on", "Receipt", "Mode"];
-    const rows = bills.map((b) => {
-      const p = sel.paymentOf(b.id);
-      return [cycleLabel(b.cycle), b.id, b.total, b.status, b.dueDate, p ? fmtDate(p.paidAt) : "", p?.receiptNo || "", p?.mode || ""];
-    });
-    download(`${flat}-statement.csv`, csv([head, ...rows]));
+  const exportStatement = () => {
+    const head = ["Cycle", "Amount", "Status", "Due date"];
+    download(`${me.flat}-statement.csv`,
+      csv([head, ...bills.map((b) => [cycleLabel(b.cycle), b.total, b.status, b.dueDate])]));
   };
 
   return (
     <>
-      <div className={`card ${dues ? "" : "brand"}`} style={dues ? { background: "linear-gradient(135deg,#FFF8E1,#FFF3E0)", borderColor: "#FFE0B2" } : undefined}>
+      <div className={`card ${dues ? "" : "brand"}`}
+        style={dues ? { background: "var(--warn-bg)", borderColor: "var(--warn-border)" } : undefined}>
         <div className="row top">
           <div className="grow">
-            <p className="tiny" style={{ color: dues ? "var(--amber)" : undefined, fontWeight: 700 }}>{dues ? "Outstanding" : "All clear"}</p>
-            <p className="num" style={{ fontSize: 30, color: dues ? "#BF360C" : "#fff" }}>{inr(dues)}</p>
-            {due[0] && <p className="tiny" style={{ marginTop: 4 }}>Next due {fmtDate(due[0].dueDate)} · {cycleLabel(due[0].cycle)}</p>}
-            {!dues && <p className="sub" style={{ marginTop: 4 }}>No pending maintenance for {flat}.</p>}
+            <p className="tiny" style={{ color: dues ? "var(--warn)" : undefined, fontWeight: 600, textTransform: "uppercase", letterSpacing: ".06em" }}>
+              {dues ? "Outstanding" : "All clear"}
+            </p>
+            <p className="h1" style={{ marginTop: 4, color: dues ? "var(--warn)" : "#fff" }}>{inr(dues)}</p>
+            {due[0] && <p className="tiny" style={{ marginTop: 5 }}>Next due {fmtDate(due[0].dueDate)} · {cycleLabel(due[0].cycle)}</p>}
+            {!dues && <p className="sub" style={{ marginTop: 5, fontSize: 12.5 }}>No pending maintenance for {me.flat}.</p>}
           </div>
-          {due[0] && <Btn onClick={() => setPay(due[0])}>Pay now</Btn>}
+          {due[0] && <Btn onClick={() => setPayTarget(due[0])}>Pay now</Btn>}
         </div>
       </div>
 
-      {settling.length > 0 && settling.map((p) => <SettlementTracker key={p.id} p={p} />)}
+      {recent && <SettlementTracker p={recent} />}
 
       <div className="grid3">
-        <Stat value={paid.length} label="Bills paid" color="var(--green)" />
-        <Stat value={due.length} label="Pending" color={due.length ? "var(--amber)" : "var(--ink3)"} />
-        <Stat value={db.settings.lateFeePct + "%"} label="Late fee" color="var(--red)" />
+        <Stat value={paid.length} label="Bills paid" color="var(--ok)" />
+        <Stat value={due.length} label="Pending" color={due.length ? "var(--warn)" : "var(--ink-4)"} />
+        <Stat value={`${db.settings.lateFeePct}%`} label="Late fee" color="var(--bad)" />
       </div>
 
-      <div style={{ display: "flex", gap: 9, margin: "12px 0" }}>
-        <Btn block variant="ghost" icon={Icons.Download} onClick={exportLedger}>Download statement</Btn>
-      </div>
+      <Btn block variant="ghost" icon={Icons.Download} style={{ margin: "12px 0" }} onClick={exportStatement}>
+        Download statement
+      </Btn>
+
+      {error && (
+        <Alert kind="err" icon={Icons.AlertTri}>
+          {error.message} <button className="linkbtn" style={{ color: "inherit", textDecoration: "underline" }} onClick={refetch}>Retry</button>
+        </Alert>
+      )}
 
       <Alert kind="ok" icon={Icons.Zap}>
         Payments settle to the society's bank account within {db.settings.settlementMins} minutes, and your flat number appears in the bank narration — so the treasurer never has to guess who paid.
@@ -69,45 +72,24 @@ export default function Payments() {
       <Segmented value={tab} onChange={setTab} options={[
         { value: "due", label: `Due (${due.length})` },
         { value: "paid", label: "Paid" },
-        { value: "receipts", label: "Receipts" },
       ]} />
 
-      {tab === "due" && (
+      {loading ? <SkeletonList rows={3} /> : (
         <div className="list">
-          {due.map((b) => <BillRow key={b.id} b={b} onOpen={() => setOpen(b)} />)}
-          {!due.length && <Empty icon={Icons.CheckCircle} title="Nothing due" note="Every bill for your flat is settled." />}
+          {(tab === "due" ? due : paid).map((b) => <BillRow key={b.id} b={b} onOpen={() => setOpen(b)} />)}
+          {tab === "due" && !due.length && <Empty icon={Icons.CheckCircle} title="Nothing due" note="Every bill for your flat is settled." />}
+          {tab === "paid" && !paid.length && <Empty icon={Icons.Doc} title="No paid bills yet" />}
         </div>
       )}
 
-      {tab === "paid" && (
-        <div className="list">
-          {paid.map((b) => <BillRow key={b.id} b={b} onOpen={() => setOpen(b)} />)}
-          {!paid.length && <Empty icon={Icons.Doc} title="No paid bills yet" />}
-        </div>
+      {open && (
+        <BillSheet b={open} paymentFor={paymentFor} onClose={() => setOpen(null)}
+          onPay={() => { setPayTarget(open); setOpen(null); }} />
       )}
-
-      {tab === "receipts" && (
-        <div className="list">
-          {myPayments.map((p) => (
-            <div key={p.id} className="li">
-              <div className="ico-tile"><Icons.Doc size={18} /></div>
-              <div className="grow">
-                <p className="h4">{p.receiptNo}</p>
-                <p className="tiny" style={{ marginTop: 2 }}>{fmtDateTime(p.paidAt)} · {p.mode} · {p.txnId}</p>
-                <p className="tiny mono" style={{ marginTop: 2 }}>{p.narration}</p>
-              </div>
-              <div className="right">
-                <p className="h4">{inr(p.amount)}</p>
-                <Badge color={p.reconciled ? "green" : "amber"}>{p.reconciled ? "Reconciled" : "Settling"}</Badge>
-              </div>
-            </div>
-          ))}
-          {!myPayments.length && <Empty icon={Icons.Doc} title="No receipts yet" />}
-        </div>
+      {payTarget && (
+        <PaySheet b={payTarget} pay={pay} onClose={() => setPayTarget(null)}
+          onPaid={(p) => { setRecent(p); setPayTarget(null); }} />
       )}
-
-      {open && <BillSheet b={open} onClose={() => setOpen(null)} onPay={() => { setOpen(null); setPay(open); }} />}
-      {pay && <PaySheet b={pay} onClose={() => setPay(null)} />}
     </>
   );
 }
@@ -119,25 +101,32 @@ function SettlementTracker({ p }) {
   const done = Math.min(100, Math.max(0, ((total - Math.round(left.ms / 60000)) / total) * 100));
   return (
     <div className="card">
-      <div className="row" style={{ marginBottom: 8 }}>
+      <div className="row" style={{ marginBottom: 9 }}>
         <div className="grow">
           <p className="h4">Settling to the society account</p>
-          <p className="tiny" style={{ marginTop: 2 }}>{p.receiptNo} · {inr(p.amount)} · {p.mode}</p>
+          <p className="tiny" style={{ marginTop: 3 }}>{p.receiptNo} · {inr(p.amount)} · {p.mode}</p>
         </div>
         <Badge color="blue">{left.late ? "Settled" : `~${left.txt} left`}</Badge>
       </div>
-      <div className="bar"><i style={{ width: `${done}%`, background: "var(--blue)" }} /></div>
-      <p className="tiny mono" style={{ marginTop: 8 }}>{p.narration}</p>
+      <div className="bar"><i style={{ width: `${done}%`, background: "var(--info)" }} /></div>
+      <p className="tiny mono" style={{ marginTop: 9 }}>{p.narration}</p>
     </div>
   );
 }
 
-function BillSheet({ b, onClose, onPay }) {
-  const { db, sel } = useApp();
-  const p = sel.paymentOf(b.id);
+function BillSheet({ b, paymentFor, onClose, onPay }) {
+  const { db } = useApp();
+  const [payment, setPayment] = useState(null);
+
+  useEffect(() => {
+    let alive = true;
+    if (b.status === "paid") Promise.resolve(paymentFor(b)).then((p) => alive && setPayment(p)).catch(() => {});
+    return () => { alive = false; };
+  }, [b, paymentFor]);
+
   return (
     <Sheet title={`Bill · ${cycleLabel(b.cycle)}`} onClose={onClose}>
-      <div className="wrap" style={{ marginBottom: 12 }}>
+      <div className="wrap" style={{ marginBottom: 14 }}>
         <Badge color={b.status === "paid" ? "green" : b.status === "overdue" ? "red" : "amber"}>{b.status}</Badge>
         <Badge>Flat {b.flatCode}</Badge>
         <Badge>Due {fmtDate(b.dueDate)}</Badge>
@@ -152,52 +141,56 @@ function BillSheet({ b, onClose, onPay }) {
               <td className="right">{i.gst ? inr(i.gst) : "—"}</td>
             </tr>
           ))}
-          {b.lateFee > 0 && <tr><td style={{ color: "var(--red)" }}>Late payment fee</td><td className="right" style={{ color: "var(--red)" }}>{inr(b.lateFee)}</td><td className="right">—</td></tr>}
+          {b.lateFee > 0 && <tr><td style={{ color: "var(--bad)" }}>Late payment fee</td><td className="right" style={{ color: "var(--bad)" }}>{inr(b.lateFee)}</td><td className="right">—</td></tr>}
         </tbody>
       </table>
       <div className="hairline" />
       <div className="row"><span className="muted">Subtotal</span><b>{inr(b.subtotal)}</b></div>
       <div className="row" style={{ marginTop: 6 }}><span className="muted">GST</span><b>{inr(b.gst)}</b></div>
-      <div className="row" style={{ marginTop: 10 }}><span className="h3">Total</span><span className="h2">{inr(b.total)}</span></div>
+      <div className="row" style={{ marginTop: 12 }}><span className="h3">Total</span><span className="h1" style={{ fontSize: 20 }}>{inr(b.total)}</span></div>
 
-      {p ? (
+      {b.status === "paid" ? (
         <div className="alert ok" style={{ marginTop: 16 }}>
           <Icons.CheckCircle size={17} />
-          <span className="grow">Paid {fmtDateTime(p.paidAt)} via {p.mode}. Receipt <b>{p.receiptNo}</b>, settled to the society account in {minsBetween(p.paidAt, p.settledAt)} minutes.</span>
+          <span className="grow">
+            {payment
+              ? <>Paid {fmtDateTime(payment.paidAt)} via {payment.mode}. Receipt <b>{payment.receiptNo}</b>, settled in {minsBetween(payment.paidAt, payment.settledAt)} minutes.</>
+              : "Paid."}
+          </span>
         </div>
       ) : (
         <Btn block style={{ marginTop: 16 }} icon={Icons.Rupee} onClick={onPay}>Pay {inr(b.total)}</Btn>
       )}
       <p className="hint" style={{ marginTop: 12 }}>
-        Society GSTIN {db.settings.gstin} · Bank {db.settings.bank.name} · A/c ••••{db.settings.bank.account.slice(-4)}
+        Society GSTIN {db.settings.gstin} · {db.settings.bank?.name} · A/c ••••{String(db.settings.bank?.account || "").slice(-4)}
       </p>
     </Sheet>
   );
 }
 
-function PaySheet({ b, onClose }) {
+function PaySheet({ b, pay, onClose, onPaid }) {
   const { db } = useApp();
-  const A = useActions();
   const [mode, setMode] = useState("UPI");
   const [state, setState] = useState("choose");
   const [receipt, setReceipt] = useState(null);
+  const [err, setErr] = useState("");
 
-  const run = () => {
+  const run = async () => {
     setState("processing");
-    setTimeout(() => {
-      const p = A.payBill(b, mode);
-      setReceipt(p);
-      setState("done");
-    }, 1200);
+    setErr("");
+    const res = await pay(b, mode);
+    if (!res.ok) { setErr(res.error?.message || "Payment could not be recorded"); setState("choose"); return; }
+    setReceipt(res.payment);
+    setState("done");
   };
 
   if (state === "done" && receipt) {
     return (
-      <Sheet title="Payment successful" onClose={onClose}>
-        <div className="center" style={{ padding: "10px 0 18px" }}>
-          <Icons.CheckCircle size={58} style={{ color: "var(--green)" }} />
-          <p className="h1" style={{ marginTop: 12 }}>{inr(receipt.amount)}</p>
-          <p className="muted">paid for {cycleLabel(b.cycle)}</p>
+      <Sheet title="Payment successful" onClose={() => { onPaid(receipt); onClose(); }}>
+        <div className="center" style={{ padding: "8px 0 20px" }}>
+          <Icons.CheckCircle size={54} style={{ color: "var(--ok)" }} />
+          <p className="h1" style={{ marginTop: 14 }}>{inr(receipt.amount)}</p>
+          <p className="muted" style={{ marginTop: 4 }}>paid for {cycleLabel(b.cycle)}</p>
         </div>
         <div className="card flat">
           <div className="row"><span className="muted">Receipt</span><b>{receipt.receiptNo}</b></div>
@@ -206,12 +199,12 @@ function PaySheet({ b, onClose }) {
           <div className="hairline" />
           <div className="row"><span className="muted">Mode</span><b>{receipt.mode}</b></div>
           <div className="hairline" />
-          <div className="row"><span className="muted">Bank narration</span><b className="mono" style={{ fontSize: 11 }}>{receipt.narration}</b></div>
+          <div className="row"><span className="muted">Narration</span><b className="mono" style={{ fontSize: 11 }}>{receipt.narration}</b></div>
         </div>
         <Alert kind="ok" icon={Icons.Zap}>
-          Funds reach the society account by {new Date(receipt.settledAt).toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit" })} — within {db.settings.settlementMins} minutes, not the 2–3 days other platforms take.
+          Funds reach the society account by {new Date(receipt.settledAt).toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit" })} — within {db.settings.settlementMins} minutes.
         </Alert>
-        <Btn block onClick={onClose}>Done</Btn>
+        <Btn block onClick={() => { onPaid(receipt); onClose(); }}>Done</Btn>
       </Sheet>
     );
   }
@@ -225,23 +218,28 @@ function PaySheet({ b, onClose }) {
         <div className="hairline" />
         <div className="row"><span className="h4">Payable</span><span className="h3">{inr(b.total)}</span></div>
       </div>
-      <p className="h4" style={{ margin: "6px 0 9px" }}>Choose a payment mode</p>
+      <p className="h4" style={{ margin: "4px 0 10px" }}>Choose a payment mode</p>
       <div className="list">
         {MODES.map((m) => (
           <div key={m.id} className="li tap" onClick={() => setMode(m.id)}>
-            <div className="ico-tile" style={mode === m.id ? { background: "var(--brand)", color: "#fff" } : undefined}><m.icon size={18} /></div>
+            <div className="ico-tile" style={mode === m.id ? { background: "var(--accent)", color: "#fff" } : undefined}>
+              <m.icon size={17} />
+            </div>
             <div className="grow">
               <p className="h4">{m.label}</p>
-              <p className="tiny" style={{ marginTop: 2 }}>{m.note}</p>
+              <p className="tiny" style={{ marginTop: 3 }}>{m.note}</p>
             </div>
-            {mode === m.id ? <Icons.CheckCircle size={19} style={{ color: "var(--brand)" }} /> : <span style={{ width: 19 }} />}
+            {mode === m.id ? <Icons.CheckCircle size={18} style={{ color: "var(--accent)" }} /> : <span style={{ width: 18 }} />}
           </div>
         ))}
       </div>
+      {err && <p className="err" style={{ marginBottom: 10 }}>{err}</p>}
       <Btn block style={{ marginTop: 12 }} disabled={state === "processing"} icon={state === "processing" ? undefined : Icons.Lock} onClick={run}>
-        {state === "processing" ? "Processing…" : `Pay ${inr(b.total)} securely`}
+        {state === "processing" ? "Recording…" : `Pay ${inr(b.total)}`}
       </Btn>
-      <p className="hint center" style={{ marginTop: 10 }}>Demo build — no real gateway is called and no money moves.</p>
+      <p className="hint center" style={{ marginTop: 10 }}>
+        No payment gateway is connected yet — this records the receipt and the ledger entry. Online collection arrives in phase 2.
+      </p>
     </Sheet>
   );
 }

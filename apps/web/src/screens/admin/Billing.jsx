@@ -1,15 +1,17 @@
 import { useMemo, useState } from "react";
 import Icons from "../../icons";
-import { Badge, Btn, Empty, Sheet, Segmented, SearchBar, Stat, Alert, Confirm, Select } from "../../components/ui";
+import { Badge, Btn, Empty, Sheet, Segmented, SearchBar, Stat, Alert, Confirm, Select, SkeletonList } from "../../components/ui";
 import { canApproveRun } from "@gvs/shared";
 import { useApp } from "../../store";
 import { useActions } from "../../store/actions";
+import { useBillingRun } from "../../data/bills";
 import { inr, lakh, cycleLabel, fmtDate, thisCycle, shiftCycle, pct, csv, download } from "../../lib/format";
 
 export default function Billing() {
-  const { db, me, can, sel, say, setColl, logAudit } = useApp();
+  const { db, me, can, sel, say, setColl, logAudit, live } = useApp();
   const A = useActions();
   const [cycle, setCycle] = useState(thisCycle());
+  const run = useBillingRun(cycle);
   const [tab, setTab] = useState("all");
   const [q, setQ] = useState("");
   const [confirm, setConfirm] = useState(null);
@@ -21,7 +23,7 @@ export default function Billing() {
     return [...set].sort().reverse();
   }, [db.bills]);
 
-  const runBills = db.bills.filter((b) => b.cycle === cycle);
+  const runBills = run.bills;
   const drafts = runBills.filter((b) => b.status === "pending-approval");
   const issued = runBills.filter((b) => b.status !== "pending-approval");
   const paid = runBills.filter((b) => b.status === "paid");
@@ -38,10 +40,12 @@ export default function Billing() {
   }, [runBills, tab, q]);
 
   const isMaker = can("billing.make");
-  // Separation of duties, decided by the same shared rule the API enforces.
+  /* Separation of duties. Live mode takes the server's verdict — it is the one
+     that will actually accept or refuse the approval; demo mode evaluates the
+     same shared rule locally. */
   const approval = drafts.length ? canApproveRun(me, drafts[0]) : { ok: false, reason: "no_drafts" };
-  const preparedByMe = approval.reason === "maker_is_checker";
-  const isChecker = approval.ok;
+  const isChecker = live ? !!run.canApprove : approval.ok;
+  const preparedByMe = (live ? run.approvalBlockedBy : approval.reason) === "maker_is_checker";
 
   const applyLateFees = () => {
     let n = 0;
@@ -87,7 +91,7 @@ export default function Billing() {
       {drafts.length > 0 ? (
         <>
           <Alert kind="warn" icon={Icons.Lock}>
-            <b>{drafts.length} draft bills are waiting for approval.</b> Prepared by {sel.userName(drafts[0].makerId)}. No bill reaches a resident until the treasurer approves this run.
+            <b>{drafts.length} draft bills are waiting for approval.</b>{drafts[0].makerId === me.id ? " You prepared this run." : ""} No bill reaches a resident until a second officer signs off.
           </Alert>
           {isChecker ? (
             <div style={{ display: "flex", gap: 9, marginBottom: 12 }}>
@@ -108,7 +112,7 @@ export default function Billing() {
             <Alert kind="info" icon={Icons.Doc}>
               No bills exist for {cycleLabel(cycle)}. Generating creates one draft bill per flat from the charge heads, then sends the run for approval.
             </Alert>
-            <Btn block icon={Icons.Plus} style={{ marginBottom: 12 }} onClick={() => A.generateBills(cycle)}>
+            <Btn block icon={Icons.Plus} style={{ marginBottom: 12 }} onClick={() => run.generate()}>
               Generate {db.flats.length} bills for {cycleLabel(cycle)}
             </Btn>
           </>
@@ -117,7 +121,7 @@ export default function Billing() {
 
       <div style={{ display: "flex", gap: 9, marginBottom: 12, flexWrap: "wrap" }}>
         <Btn size="sm" variant="ghost" icon={Icons.Download} onClick={exportRun}>Export CSV</Btn>
-        {isChecker && <Btn size="sm" variant="ghost" icon={Icons.Alert} onClick={applyLateFees}>Apply late fees</Btn>}
+        {isChecker && !live && <Btn size="sm" variant="ghost" icon={Icons.Alert} onClick={applyLateFees}>Apply late fees</Btn>}
         <Btn size="sm" variant="ghost" icon={Icons.Send} onClick={() => say(`Reminder sent to ${runBills.filter((b) => b.status !== "paid").length} flats.`)}>Send reminders</Btn>
       </div>
 
@@ -128,7 +132,15 @@ export default function Billing() {
         { value: "overdue", label: `Overdue (${overdue.length})` },
       ]} />
 
-      <div className="list">
+      {run.error && (
+        <Alert kind="err" icon={Icons.AlertTri}>
+          {run.error.message} <button className="linkbtn" style={{ color: "inherit", textDecoration: "underline" }} onClick={run.reload}>Retry</button>
+        </Alert>
+      )}
+
+      {run.loading && <SkeletonList rows={4} />}
+
+      <div className="list" style={run.loading ? { display: "none" } : undefined}>
         {list.slice(0, 60).map((b) => (
           <div key={b.id} className="li tap" onClick={() => setOpen(b)}>
             <div className="ico-tile"><Icons.Doc size={17} /></div>
@@ -149,12 +161,12 @@ export default function Billing() {
       {confirm === "approve" && (
         <Confirm title={`Approve ${drafts.length} bills?`}
           body={`Total value ${inr(drafts.reduce((s, b) => s + b.total, 0))}. Once approved, bills are issued to residents and the run is locked in the audit trail under your name.`}
-          confirmLabel="Approve & issue" onConfirm={() => A.approveRun(cycle)} onClose={() => setConfirm(null)} />
+          confirmLabel="Approve & issue" onConfirm={() => run.approve()} onClose={() => setConfirm(null)} />
       )}
       {confirm === "reject" && (
         <Confirm title="Reject this draft run?" danger confirmLabel="Reject run"
           body="All draft bills for this cycle are discarded. The maker can regenerate after fixing the charge heads."
-          onConfirm={() => A.rejectRun(cycle, "Rejected by checker")} onClose={() => setConfirm(null)} />
+          onConfirm={() => run.reject("Rejected by checker")} onClose={() => setConfirm(null)} />
       )}
       {open && <BillDetail b={open} onClose={() => setOpen(null)} />}
     </>

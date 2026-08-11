@@ -99,10 +99,24 @@ Things worth keeping true if you change this:
   access. In production, attach an IAM role rather than setting keys; it needs
   only `PutObject`, `GetObject`, `DeleteObject` and `HeadObject` on
   `<bucket>/societies/*`.
+- **The bucket needs a CORS rule.** Because the browser posts directly to S3,
+  the preflight fails without one and every upload dies before a byte moves —
+  the API looks fine and the upload silently never happens. Set:
+
+```json
+[{
+  "AllowedOrigins": ["https://your-web-app.example"],
+  "AllowedMethods": ["POST", "GET", "HEAD"],
+  "AllowedHeaders": ["*"],
+  "ExposeHeaders": ["ETag"],
+  "MaxAgeSeconds": 3000
+}]
+```
 
 `S3_ENDPOINT` and `S3_FORCE_PATH_STYLE` point the client at a local
-S3-compatible server; the tests use them to run the real presigned flow against
-an in-process one.
+S3-compatible server. `npm run dev:s3` starts one on port 9100 with the CORS
+rule already applied, and the tests run the real presigned flow against an
+in-process instance.
 
 ## Decisions worth knowing
 

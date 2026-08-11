@@ -23,6 +23,15 @@ const SELECT = `
     JOIN flats f ON f.id = v.flat_id
     LEFT JOIN gates g ON g.id = v.gate_id`;
 
+/** The society's gate devices — the client needs real ids to target one. */
+visitorsRouter.get("/gates", wrap(async (req, res) => {
+  const rows = await many(
+    "SELECT id, name, device, status, features FROM gates WHERE society_id = $1 ORDER BY created_at",
+    [req.user.society_id],
+  );
+  res.json({ gates: rows });
+}));
+
 /** Residents see their own flat's traffic; gate roles see the whole society. */
 visitorsRouter.get("/", validateQuery(listQuerySchema), wrap(async (req, res) => {
   const { limit, offset, status, flatCode } = req.validQuery;

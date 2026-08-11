@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 import { can as canDo } from "@gvs/shared";
 import { buildSeed } from "./seed";
 import { uid, iso } from "../lib/format";
+import { api, isLive, onAuthChange, clearTokens } from "../lib/api";
 
 const DB_KEY = "gvs.db.v4";
 const SESSION_KEY = "gvs.session.v4";
@@ -20,27 +21,76 @@ const load = () => {
 const Ctx = createContext(null);
 export const useApp = () => useContext(Ctx);
 
+/**
+ * Holds both halves of the app during the migration.
+ *
+ * The local seeded store still backs every screen that has no endpoint yet. When
+ * `VITE_API_URL` is set, identity and the migrated resources come from the API
+ * instead; the repository hooks in src/data are the only place that branches.
+ */
 export function AppProvider({ children }) {
+  const live = isLive();
+
   const [db, setDb] = useState(load);
-  const [session, setSession] = useState(() => {
-    try { return JSON.parse(localStorage.getItem(SESSION_KEY) || "null"); } catch { return null; }
-  });
   const [toast, setToast] = useState(null);
 
+  /* --- demo-mode session: a user id into the local store --- */
+  const [localSession, setLocalSession] = useState(() => {
+    if (live) return null;
+    try { return JSON.parse(localStorage.getItem(SESSION_KEY) || "null"); } catch { return null; }
+  });
+
+  /* --- live-mode session: whatever /api/me says --- */
+  const [server, setServer] = useState({
+    status: live ? "resuming" : "demo", user: null, flat: null, society: null, capabilities: [],
+  });
+
   useEffect(() => { localStorage.setItem(DB_KEY, JSON.stringify(db)); }, [db]);
+
   useEffect(() => {
-    if (session) localStorage.setItem(SESSION_KEY, JSON.stringify(session));
+    if (live) return;
+    if (localSession) localStorage.setItem(SESSION_KEY, JSON.stringify(localSession));
     else localStorage.removeItem(SESSION_KEY);
-  }, [session]);
+  }, [live, localSession]);
 
-  const me = useMemo(() => db.users.find((u) => u.id === session?.userId) || null, [db.users, session]);
+  // Cold start in live mode: try to resume from the stored refresh token.
+  useEffect(() => {
+    if (!live) return;
+    let alive = true;
+    api.resume()
+      .then((me) => alive && setServer(me
+        ? { status: "authed", ...me }
+        : { status: "anon", user: null, flat: null, society: null, capabilities: [] }))
+      .catch(() => alive && setServer({ status: "anon", user: null, flat: null, society: null, capabilities: [] }));
+    return () => { alive = false; };
+  }, [live]);
+
+  // The client signs itself out when a refresh token is rejected mid-session.
+  useEffect(() => onAuthChange((reason) => {
+    if (reason === "expired" || reason === "logout") {
+      setServer({ status: "anon", user: null, flat: null, society: null, capabilities: [] });
+      if (reason === "expired") setToast({ text: "Session expired — please sign in again", kind: "bad", at: Date.now() });
+    }
+  }), []);
+
+  const localMe = useMemo(
+    () => (live ? null : db.users.find((u) => u.id === localSession?.userId) || null),
+    [live, db.users, localSession],
+  );
+
+  const me = live ? server.user : localMe;
   const role = me?.role || null;
+  const booting = live && server.status === "resuming";
 
-  /* Capability checks come from @gvs/shared, the same table the API enforces.
-     This copy only decides what to render — the server re-checks every request. */
-  const can = useCallback((cap) => canDo(role, cap), [role]);
+  /* In live mode the server states the caller's capabilities; the shared matrix
+     produces the same answer, but the authoritative copy is the one that also
+     gates the requests. */
+  const can = useCallback(
+    (cap) => (live ? server.capabilities.includes(cap) : canDo(role, cap)),
+    [live, server.capabilities, role],
+  );
 
-  /* ---- generic collection writers ---- */
+  /* ---- local collection writers (demo data and not-yet-migrated screens) ---- */
   const setColl = useCallback((coll, fn) => setDb((d) => ({ ...d, [coll]: fn(d[coll] || []) })), []);
   const add = useCallback((coll, item) => {
     const withId = { id: item.id || uid(coll.slice(0, 3)), ...item };
@@ -53,21 +103,64 @@ export function AppProvider({ children }) {
   const setSettings = useCallback((changes) => setDb((d) => ({ ...d, settings: { ...d.settings, ...changes } })), []);
 
   const logAudit = useCallback((action, entity, detail) => {
+    // Live writes are audited server-side; this only records local demo activity.
+    if (live) return;
     setDb((d) => ({
       ...d,
-      audit: [{ id: uid("au"), at: iso(), actor: session?.userId || "system", action, entity, detail }, ...d.audit].slice(0, 400),
+      audit: [{ id: uid("au"), at: iso(), actor: localSession?.userId || "system", action, entity, detail }, ...d.audit].slice(0, 400),
     }));
-  }, [session]);
+  }, [live, localSession]);
 
   const say = useCallback((text, kind = "ok") => setToast({ text, kind, at: Date.now() }), []);
 
-  const login = useCallback((userId) => {
-    setSession({ userId, at: iso() });
-  }, []);
-  const logout = useCallback(() => setSession(null), []);
-  const resetDemo = useCallback(() => { setDb(buildSeed()); setSession(null); }, []);
+  const login = useCallback(async (arg, password) => {
+    if (!live) { setLocalSession({ userId: arg, at: iso() }); return { ok: true }; }
+    try {
+      await api.login(arg, password);
+      const me = await api.get("/api/me");
+      setServer({ status: "authed", ...me });
+      return { ok: true };
+    } catch (err) {
+      return { ok: false, error: err };
+    }
+  }, [live]);
 
-  /* ---- selectors used across screens ---- */
+  const logout = useCallback(async () => {
+    if (!live) { setLocalSession(null); return; }
+    await api.logout();
+    setServer({ status: "anon", user: null, flat: null, society: null, capabilities: [] });
+  }, [live]);
+
+  const refreshMe = useCallback(async () => {
+    if (!live) return;
+    const me = await api.get("/api/me");
+    setServer({ status: "authed", ...me });
+  }, [live]);
+
+  const resetDemo = useCallback(() => {
+    setDb(buildSeed());
+    if (live) { clearTokens(); setServer({ status: "anon", user: null, flat: null, society: null, capabilities: [] }); }
+    else setLocalSession(null);
+  }, [live]);
+
+  /* Society settings: the server's copy wins where it exists, so overstay limits
+     and SLA hours match what the API will actually enforce. */
+  const settings = useMemo(() => {
+    if (!live || !server.society) return db.settings;
+    return {
+      ...db.settings,
+      ...(server.society.settings || {}),
+      societyName: server.society.name,
+      address: server.society.address,
+      regNo: server.society.regNo,
+      gstin: server.society.gstin,
+      bank: server.society.bank || db.settings.bank,
+    };
+  }, [live, server.society, db.settings]);
+
+  const scopedDb = useMemo(() => ({ ...db, settings }), [db, settings]);
+
+  /* ---- selectors over the local store ---- */
   const sel = useMemo(() => {
     const userById = (id) => db.users.find((u) => u.id === id);
     const flatByCode = (c) => db.flats.find((f) => f.code === c);
@@ -96,9 +189,10 @@ export function AppProvider({ children }) {
   }, [db, me]);
 
   const value = useMemo(() => ({
-    db, setDb, me, role, can, session, login, logout, resetDemo,
+    live, booting, db: scopedDb, setDb, me, role, can, login, logout, refreshMe, resetDemo,
     add, patch, remove, setColl, setSettings, logAudit, say, toast, setToast, sel,
-  }), [db, me, role, can, session, login, logout, resetDemo, add, patch, remove, setColl, setSettings, logAudit, say, toast, sel]);
+  }), [live, booting, scopedDb, me, role, can, login, logout, refreshMe, resetDemo,
+    add, patch, remove, setColl, setSettings, logAudit, say, toast, sel]);
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

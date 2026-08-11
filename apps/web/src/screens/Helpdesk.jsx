@@ -1,14 +1,16 @@
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Icons from "../icons";
-import { Badge, Btn, Empty, Sheet, Segmented, SearchBar, Stat, Alert, Avatar, Select, TextArea } from "../components/ui";
+import { Badge, Btn, Empty, Sheet, Segmented, SearchBar, Stat, Alert, Avatar, Select, TextArea, SkeletonList } from "../components/ui";
 import { TicketRow } from "../components/entities";
 import { RaiseTicketSheet } from "../components/sheets";
 import { useApp } from "../store";
 import { useActions } from "../store/actions";
+import { useTickets } from "../data/tickets";
 import { ago, fmtDateTime, until, pct } from "../lib/format";
 
 export default function Helpdesk({ nav, params }) {
   const { db, me, can, sel } = useApp();
+  const repo = useTickets();
   const [tab, setTab] = useState("open");
   const [q, setQ] = useState("");
   const [sheet, setSheet] = useState(null);
@@ -17,11 +19,8 @@ export default function Helpdesk({ nav, params }) {
   const manage = can("helpdesk.manage");
   const isStaff = me.role === "staff";
 
-  const scope = useMemo(() => {
-    if (isStaff) return db.tickets.filter((t) => t.assignedTo === me.id || !t.assignedTo);
-    if (manage) return db.tickets;
-    return db.tickets.filter((t) => t.flatCode === me.flat);
-  }, [db.tickets, manage, isStaff, me]);
+  // The repository already applies the same scoping the API enforces.
+  const scope = repo.tickets;
 
   const list = useMemo(() => {
     const t = q.trim().toLowerCase();
@@ -65,83 +64,128 @@ export default function Helpdesk({ nav, params }) {
         { value: "all", label: "All" },
       ]} />
 
-      <div className="list">
-        {list.map((t) => <TicketRow key={t.id} t={t} onOpen={() => setOpen(t)} />)}
-        {!list.length && <Empty icon={Icons.Ticket} title="Nothing here" note="Raised complaints and their SLA clocks show up in this list." />}
-      </div>
+      {repo.error && (
+        <Alert kind="err" icon={Icons.AlertTri}>
+          {repo.error.message} <button className="linkbtn" style={{ color: "inherit", textDecoration: "underline" }} onClick={repo.refetch}>Retry</button>
+        </Alert>
+      )}
+
+      {repo.loading ? <SkeletonList rows={4} /> : (
+        <div className="list">
+          {list.map((t) => <TicketRow key={t.id} t={t} onOpen={() => setOpen(t)} />)}
+          {!list.length && <Empty icon={Icons.Ticket} title="Nothing here" note="Raised complaints and their SLA clocks show up in this list." />}
+        </div>
+      )}
 
       {sheet === "new" && <RaiseTicketSheet onClose={() => setSheet(null)} />}
-      {open && <TicketSheet t={db.tickets.find((x) => x.id === open.id) || open} onClose={() => setOpen(null)} />}
+      {open && <TicketSheet id={open.id} repo={repo} onClose={() => setOpen(null)} />}
     </>
   );
 }
 
-function TicketSheet({ t, onClose }) {
-  const { db, me, can, sel, patch } = useApp();
-  const A = useActions();
+function TicketSheet({ id, repo, onClose }) {
+  const { db, me, can, sel, live } = useApp();
+  const [t, setT] = useState(null);
   const [text, setText] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const reload = useCallback(async () => {
+    const fresh = await repo.load(id);
+    setT(fresh);
+  }, [id, repo]);
+
+  useEffect(() => { reload().catch(() => {}); }, [reload]);
+
+  if (!t) {
+    return (
+      <Sheet title="Loading…" onClose={onClose}>
+        <SkeletonList rows={2} />
+      </Sheet>
+    );
+  }
+
   const manage = can("helpdesk.manage");
   const sla = until(t.slaDueAt);
   const staff = db.users.filter((u) => u.role === "staff" || u.role === "guard");
   const mine = t.raisedBy === me.id;
 
+  const act = async (fn) => {
+    setBusy(true);
+    await fn();
+    await reload();
+    setBusy(false);
+  };
+
   return (
     <Sheet title={t.ref} onClose={onClose}>
-      <p className="h3" style={{ marginBottom: 6 }}>{t.title}</p>
-      <div className="wrap" style={{ marginBottom: 12 }}>
+      <p className="h3" style={{ marginBottom: 8 }}>{t.title}</p>
+      <div className="wrap" style={{ marginBottom: 14 }}>
         <Badge color={t.status === "open" ? "amber" : t.status === "in-progress" ? "blue" : "green"}>{t.status}</Badge>
         <Badge color={t.priority === "high" ? "red" : "amber"}>{t.priority}</Badge>
         <Badge>{t.category}</Badge>
         <Badge>{t.flatCode}</Badge>
         {(t.status === "open" || t.status === "in-progress") && (
-          <Badge color={sla.late ? "red" : "green"}>SLA {sla.late ? `breached by ${sla.txt}` : `${sla.txt} left`}</Badge>
+          <Badge color={sla.late ? "red" : "green"}>SLA {sla.late ? `over by ${sla.txt}` : `${sla.txt} left`}</Badge>
         )}
       </div>
-      <p className="muted" style={{ fontSize: 14, lineHeight: 1.6, marginBottom: 12 }}>{t.body}</p>
+      <p className="muted" style={{ fontSize: 13.5, lineHeight: 1.6, marginBottom: 12 }}>{t.body}</p>
       <p className="tiny" style={{ marginBottom: 16 }}>
-        Raised by {sel.userName(t.raisedBy)} · {fmtDateTime(t.at)} · via {t.source === "ai-call" ? "AI voice helpdesk" : "app"}
+        Raised by {t.raisedByName || sel.userName(t.raisedBy)} · {fmtDateTime(t.at)} · via {t.source === "ai-call" ? "AI voice helpdesk" : "app"}
       </p>
 
       {manage && (
         <div className="card flat">
-          <Select label="Assign to" value={t.assignedTo || ""} onChange={(e) => { patch("tickets", t.id, { assignedTo: e.target.value || null, status: e.target.value && t.status === "open" ? "in-progress" : t.status }); }}
-            options={[{ value: "", label: "Unassigned" }, ...staff.map((s) => ({ value: s.id, label: `${s.name}${s.designation ? ` · ${s.designation}` : ""}` }))]} />
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            {t.status !== "in-progress" && <Btn size="sm" variant="ghost" onClick={() => A.setTicketStatus(t, "in-progress")}>Start work</Btn>}
-            {t.status !== "resolved" && <Btn size="sm" onClick={() => A.setTicketStatus(t, "resolved")}>Mark resolved</Btn>}
-            {t.status !== "closed" && <Btn size="sm" variant="ghost" onClick={() => A.setTicketStatus(t, "closed")}>Close</Btn>}
+          <Select label="Assign to" value={t.assignedTo || ""} disabled={busy}
+            onChange={(e) => act(() => repo.update(t, { assignedTo: e.target.value || null }))}
+            options={[
+              { value: "", label: "Unassigned" },
+              ...(live && t.assignedTo && !staff.some((x) => x.id === t.assignedTo)
+                ? [{ value: t.assignedTo, label: t.assignedToName || "Currently assigned" }]
+                : []),
+              ...staff.map((sm) => ({ value: sm.id, label: `${sm.name}${sm.designation ? ` · ${sm.designation}` : ""}` })),
+            ]} />
+          <div className="wrap" style={{ gap: 8 }}>
+            {t.status !== "in-progress" && <Btn size="sm" variant="ghost" disabled={busy} onClick={() => act(() => repo.update(t, { status: "in-progress" }))}>Start work</Btn>}
+            {t.status !== "resolved" && <Btn size="sm" disabled={busy} onClick={() => act(() => repo.update(t, { status: "resolved" }))}>Mark resolved</Btn>}
+            {t.status !== "closed" && <Btn size="sm" variant="ghost" disabled={busy} onClick={() => act(() => repo.update(t, { status: "closed" }))}>Close</Btn>}
           </div>
         </div>
       )}
 
-      <p className="h4" style={{ margin: "14px 0 8px" }}>Updates ({t.comments.length})</p>
-      {t.comments.map((c) => (
-        <div key={c.id} className="li" style={{ padding: "9px 0" }}>
-          <Avatar name={sel.userName(c.by)} />
+      <p className="h4" style={{ margin: "16px 0 8px" }}>Updates ({t.comments?.length || 0})</p>
+      {(t.comments || []).map((c) => (
+        <div key={c.id} className="li" style={{ padding: "9px 0", borderBottom: "none" }}>
+          <Avatar name={c.byName || sel.userName(c.by)} />
           <div className="grow">
-            <p className="h4">{sel.userName(c.by)} <span className="tiny">· {ago(c.at)}</span></p>
+            <p className="h4">{c.byName || sel.userName(c.by)} <span className="tiny">· {ago(c.at)}</span></p>
             <p className="muted">{c.text}</p>
           </div>
         </div>
       ))}
       <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
         <input className="inp" placeholder="Add an update…" value={text} onChange={(e) => setText(e.target.value)} />
-        <Btn icon={Icons.Send} onClick={() => { if (text.trim()) { A.commentTicket(t, text.trim()); setText(""); } }} />
+        <Btn icon={Icons.Send} disabled={busy || !text.trim()}
+          onClick={() => act(async () => { await repo.comment(t, text.trim()); setText(""); })} />
       </div>
 
       {mine && t.status === "resolved" && !t.rating && (
         <>
-          <p className="h4" style={{ margin: "16px 0 8px" }}>How was the resolution?</p>
+          <p className="h4" style={{ margin: "18px 0 8px" }}>How was the resolution?</p>
           <div className="wrap">
             {[1, 2, 3, 4, 5].map((n) => (
-              <button key={n} className="chip" onClick={() => { patch("tickets", t.id, { rating: n, status: "closed" }); onClose(); }}>
-                {"★".repeat(n)}
+              <button key={n} className="chip" disabled={busy}
+                onClick={() => act(async () => { await repo.rate(t, n); onClose(); })}>
+                {"\u2605".repeat(n)}
               </button>
             ))}
           </div>
         </>
       )}
-      {t.rating && <div className="alert ok" style={{ marginTop: 14 }}><Icons.Star size={16} /><span>Rated {t.rating}/5 by the resident.</span></div>}
+      {t.rating && (
+        <div className="alert ok" style={{ marginTop: 16 }}>
+          <Icons.Star size={16} /><span>Rated {t.rating}/5 by the resident.</span>
+        </div>
+      )}
     </Sheet>
   );
 }

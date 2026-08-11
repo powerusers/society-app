@@ -3,6 +3,8 @@ import { CSS } from "./styles";
 import Icons from "./icons";
 import { AppProvider, useApp } from "./store";
 import { Toast } from "./components/ui";
+import { useVisitors } from "./data/visitors";
+import { useTickets } from "./data/tickets";
 
 import Login from "./screens/Login";
 import Home from "./screens/Home";
@@ -107,6 +109,10 @@ TABS.admin = TABS.committee;
 
 function Shell() {
   const { me, role, db, sel, toast, setToast, logout, add, say, logAudit } = useApp();
+  /* The shell owns the badge counts so they stay right on every tab, not only
+     on whichever screen happens to be open. */
+  const { visitors } = useVisitors();
+  const { tickets } = useTickets();
   const rootTab = role === "guard" ? "guardGate" : role === "staff" ? "helpdesk" : "home";
   const [tab, setTab] = useState(rootTab);
   const [stack, setStack] = useState([]);
@@ -123,15 +129,15 @@ function Shell() {
 
   const nav = useMemo(() => ({ go, back, tab, switchTab, depth: stack.length }), [go, back, tab, switchTab, stack.length]);
 
-  const pendingVisitors = sel.pendingForMe.length;
+  const pendingVisitors = visitors.filter((v) => v.status === "pending" && v.flatCode === me.flat).length;
   const unreadNotices = db.notices.filter((n) => !(n.readBy || []).includes(me.id)).length;
-  const openTickets = db.tickets.filter((t) => t.status === "open" || t.status === "in-progress").length;
-  const waitingAtGate = db.visitors.filter((v) => v.status === "waiting" || v.status === "pending").length;
+  const openTickets = tickets.filter((t) => t.status === "open" || t.status === "in-progress").length;
+  const waitingAtGate = visitors.filter((v) => v.status === "waiting" || v.status === "pending").length;
 
   const pipFor = (id) => {
     if (id === "visitors") return pendingVisitors;
     if (id === "community") return unreadNotices;
-    if (id === "helpdesk") return role === "staff" ? db.tickets.filter((t) => t.assignedTo === me.id && t.status !== "closed").length : openTickets;
+    if (id === "helpdesk") return role === "staff" ? tickets.filter((t) => t.assignedTo === me.id && t.status !== "closed").length : openTickets;
     if (id === "guardGate") return waitingAtGate;
     return 0;
   };
@@ -214,8 +220,23 @@ function SosOverlay({ onClose, db }) {
 }
 
 function Root() {
-  const { me } = useApp();
+  const { me, booting } = useApp();
+  if (booting) return <Booting />;
   return me ? <Shell /> : <Login />;
+}
+
+/** Shown only while a stored session is being resumed against the API. */
+function Booting() {
+  return (
+    <div className="app" style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100vh" }}>
+      <div className="center">
+        <div style={{ width: 52, height: 52, borderRadius: "var(--r-lg)", background: "var(--accent-soft)", color: "var(--b600)", display: "inline-flex", alignItems: "center", justifyContent: "center", marginBottom: 14 }}>
+          <Icons.Building size={24} />
+        </div>
+        <p className="muted">Restoring your session…</p>
+      </div>
+    </div>
+  );
 }
 
 export default function App() {
