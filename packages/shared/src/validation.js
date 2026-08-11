@@ -10,7 +10,17 @@ import {
 
 /** Request payload schemas. The API validates with these; forms reuse them for client-side checks. */
 
-const flatCode = z.string().regex(/^[A-Z]-\d{3}$/, "Flat code looks like A-401");
+/* Deliberately loose. Three digits is one society's numbering, not a rule —
+   a tenth-floor flat is 1003 in most towers, and blocks are sometimes two
+   letters. The authority on whether a flat exists is the society's register,
+   which the API checks and reports precisely; a format rule any tighter than
+   this rejects real flats before that check can run.
+   The message names the field the user is actually typing in, since the form
+   collects the block separately and cannot accept "A-401" in that box. */
+const flatCode = z.string().regex(
+  /^[A-Z]{1,2}-\d{1,4}[A-Z]?$/,
+  "Flat number should be 1–4 digits, like 401 or 1003",
+);
 const phone = z.string().regex(/^\d{10}$/, "Enter a 10-digit mobile number");
 const cycle = z.string().regex(/^\d{4}-\d{2}$/, "Cycle looks like 2026-08");
 
