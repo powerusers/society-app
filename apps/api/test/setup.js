@@ -7,6 +7,7 @@ process.env.NODE_ENV = "test";
 process.env.DATABASE_URL ||= "postgres://gvs:gvs@127.0.0.1:5432/gvs_test";
 process.env.JWT_SECRET ||= "test-secret";
 process.env.ACCESS_TTL ||= "15m";
+process.env.SETUP_TOKEN ||= "test-setup-token";
 
 if (!/gvs_test|_test\b/.test(process.env.DATABASE_URL)) {
   throw new Error(

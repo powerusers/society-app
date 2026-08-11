@@ -25,6 +25,10 @@ const loginLimiter = rateLimit({
 
 authRouter.post("/login", loginLimiter, validate(loginSchema), wrap(async (req, res) => {
   const { email, password } = req.body;
+  /* Email is unique across the platform (003_multi_society), so this resolves
+     to exactly one account and the caller never has to name their society at
+     sign-in. Before that constraint the same address could exist at two
+     societies and this query would have returned whichever row came first. */
   const user = await one(
     `SELECT u.*, f.code AS flat_code
        FROM users u LEFT JOIN flats f ON f.id = u.flat_id
@@ -84,20 +88,28 @@ authRouter.post("/logout", requireAuth, wrap(async (req, res) => {
 
 /** Self-registration. Creates a pending application, never a live account. */
 authRouter.post("/register", validate(registrationSchema), wrap(async (req, res) => {
-  const { name, flatCode, relation, phone, email, password } = req.body;
+  const { name, societyId, flatCode, relation, phone, email, password } = req.body;
 
-  const society = await one("SELECT id FROM societies ORDER BY created_at LIMIT 1");
-  if (!society) throw notFound("No society is configured yet");
+  /* The applicant names their society. It used to be whichever one existed,
+     which was correct while a deployment held exactly one and silently wrong
+     the moment it held two — an application would have gone to the wrong
+     committee for approval. */
+  const society = await one("SELECT id, name FROM societies WHERE id = $1", [societyId]);
+  if (!society) throw notFound("That society is not on this platform");
 
   const flat = await one("SELECT id FROM flats WHERE society_id = $1 AND code = $2", [society.id, flatCode]);
-  if (!flat) throw conflict(`Flat ${flatCode} is not on the society register`);
+  if (!flat) throw conflict(`Flat ${flatCode} is not on the register for ${society.name}`);
 
-  const existing = await one("SELECT id FROM users WHERE society_id = $1 AND email = $2", [society.id, email]);
+  /* Both checks are platform-wide, not per society: an email identifies one
+     person here, so an address already in use anywhere cannot be claimed
+     again — and queueing at two societies would only fail later, at whichever
+     committee approved second. */
+  const existing = await one("SELECT id FROM users WHERE email = $1", [email]);
   if (existing) throw conflict("That email already has an account");
 
   const pending = await one(
-    "SELECT id FROM registrations WHERE society_id = $1 AND email = $2 AND status = 'pending'",
-    [society.id, email],
+    "SELECT id FROM registrations WHERE email = $1 AND status = 'pending'",
+    [email],
   );
   if (pending) throw conflict("An application for that email is already awaiting approval");
 

@@ -1,7 +1,7 @@
 import { Router } from "express";
 import rateLimit from "express-rate-limit";
 import { setupSchema, DEFAULT_HEADS } from "@gvs/shared";
-import { one, tx } from "../db/pool.js";
+import { many, one, tx } from "../db/pool.js";
 import { config } from "../config.js";
 import { validate } from "../middleware/validate.js";
 import { hashPassword } from "../lib/password.js";
@@ -36,6 +36,26 @@ setupRouter.get("/status", wrap(async (_req, res) => {
   res.json({ needsSetup: !(await societyExists()), tokenConfigured: Boolean(config.setupToken) });
 }));
 
+/**
+ * The societies a resident can apply to. Unauthenticated, because it is read
+ * before anybody has an account.
+ *
+ * Carries name and address only — enough to recognise your own building, and
+ * nothing about who lives there or what they owe. That a society uses this app
+ * is inherently public the moment its residents can sign up; the flat register
+ * behind it stays private.
+ */
+setupRouter.get("/societies", wrap(async (req, res) => {
+  const q = String(req.query.q || "").trim();
+  const rows = await many(
+    `SELECT id, name, address FROM societies
+      WHERE ($1 = '' OR name ILIKE '%' || $1 || '%' OR address ILIKE '%' || $1 || '%')
+      ORDER BY name LIMIT 50`,
+    [q],
+  );
+  res.json({ societies: rows });
+}));
+
 setupRouter.post("/", setupLimiter, validate(setupSchema), wrap(async (req, res) => {
   /* Without a token this endpoint would hand society-wide administrator rights
      to whoever reached a freshly deployed URL first. Refusing to run is the
@@ -48,18 +68,23 @@ setupRouter.post("/", setupLimiter, validate(setupSchema), wrap(async (req, res)
   const offered = req.get("x-setup-token") || "";
   if (offered !== config.setupToken) throw forbidden("That setup token is not correct.");
 
-  if (await societyExists()) throw conflict("This instance already has a society configured.");
-
+  /* One deployment serves many societies, so this no longer closes after the
+     first. The token is what gates it every time: onboarding a society stays
+     an operator action rather than something any visitor can do. */
   const { society, admin } = req.body;
   const passwordHash = await hashPassword(admin.password);
 
   const created = await tx(async (c) => {
-    /* Serialise concurrent bootstraps. Without this, two requests can both
-       pass the existence check above and both create a society, leaving the
-       instance with two and no way to tell which one is real. */
-    await c.query("SELECT pg_advisory_xact_lock(hashtext('society_bootstrap'))");
-    const again = await c.query("SELECT id FROM societies LIMIT 1");
-    if (again.rows.length) throw conflict("This instance already has a society configured.");
+    /* Serialise creation so two requests for the same society name cannot both
+       pass their checks and land as duplicates residents could not tell apart.
+       The unique index on lower(name) is the real guarantee; this turns the
+       race into a clean error rather than a constraint violation. */
+    await c.query("SELECT pg_advisory_xact_lock(hashtext('society_create'))");
+    const clash = await c.query("SELECT id FROM societies WHERE lower(name) = lower($1)", [society.name]);
+    if (clash.rows.length) throw conflict(`A society called "${society.name}" already exists here.`);
+
+    const taken = await c.query("SELECT id FROM users WHERE email = $1", [admin.email]);
+    if (taken.rows.length) throw conflict("That email already has an account on this platform.");
 
     const { rows: [row] } = await c.query(
       `INSERT INTO societies (name, address, reg_no, gstin, settings, bank)

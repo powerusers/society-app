@@ -146,6 +146,11 @@ export const api = {
     return request("GET", "/api/setup/status", { retry: false });
   },
 
+  /** Societies a resident can apply to. Public — read before anyone has an account. */
+  async societies(q = "") {
+    return request("GET", `/api/setup/societies${q ? `?q=${encodeURIComponent(q)}` : ""}`, { retry: false });
+  },
+
   /** First-run bootstrap. Signs the new administrator in on success. */
   async setup(payload, token) {
     const data = await request("POST", "/api/setup", {

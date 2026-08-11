@@ -2,14 +2,24 @@ import "./setup.js";
 import { createApp } from "../src/app.js";
 import { migrate } from "../src/db/migrate.js";
 import { seed } from "../src/db/seed.js";
-import { closePool } from "../src/db/pool.js";
+import { closePool, query } from "../src/db/pool.js";
+
+/* Seeding wipes and rewrites; skipping it leaves whatever the last file left
+   behind, so an unseeded run has to clear the tenant tree itself. */
+const truncateAll = () => query("TRUNCATE societies CASCADE");
 
 let server;
 let base;
 
-export async function startTestServer() {
+/**
+ * @param {{seed?: boolean}} opts — pass `seed: false` for tests that need a
+ * database with no society in it, which is the state first-run setup and the
+ * multi-society flows are actually about.
+ */
+export async function startTestServer({ seed: withSeed = true } = {}) {
   await migrate({ silent: true });
-  await seed({ silent: true });
+  if (withSeed) await seed({ silent: true });
+  else await truncateAll();
   server = createApp().listen(0);
   await new Promise((r) => server.once("listening", r));
   base = `http://127.0.0.1:${server.address().port}`;
@@ -22,12 +32,13 @@ export async function stopTestServer() {
 }
 
 /** Thin fetch wrapper returning { status, body } so assertions stay readable. */
-export async function call(method, path, { token, body } = {}) {
+export async function call(method, path, { token, body, headers } = {}) {
   const res = await fetch(`${base}${path}`, {
     method,
     headers: {
       ...(body ? { "content-type": "application/json" } : {}),
       ...(token ? { authorization: `Bearer ${token}` } : {}),
+      ...headers,
     },
     body: body ? JSON.stringify(body) : undefined,
   });

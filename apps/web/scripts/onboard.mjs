@@ -62,15 +62,19 @@ await page.waitForSelector(".nav", { timeout: 15000 });
 await wait(900);
 await check("setup signs the new administrator straight in", await has("Nikhil"));
 
-// 4 — the register is empty, so nobody can sign up yet
-const before = await page.evaluate(async (api) => {
+// 4 — the society is now listed for applicants, and its register is empty
+const listed = await page.evaluate(async (api) => (await (await fetch(`${api}/api/setup/societies`)).json()).societies, API);
+await check("the new society appears in the public picker", listed.length === 1 && listed[0].name === "Sunrise Residency");
+const societyId = listed[0].id;
+
+const before = await page.evaluate(async ({ api, societyId }) => {
   const res = await fetch(`${api}/api/auth/register`, {
     method: "POST", headers: { "content-type": "application/json" },
-    body: JSON.stringify({ name: "Too Early", flatCode: "B-1003", relation: "owner", phone: "9800000000", email: "early@sunrise.in", password: "password123" }),
+    body: JSON.stringify({ name: "Too Early", societyId, flatCode: "B-1003", relation: "owner", phone: "9800000000", email: "early@sunrise.in", password: "password123" }),
   });
   return (await res.json())?.error?.message || "";
-}, API);
-await check("registration is refused before a register exists", before.includes("not on the society register"));
+}, { api: API, societyId });
+await check("registration is refused before a register exists", before.includes("not on the register"));
 
 // 5 — import the register through the UI
 await page.locator(".nav button", { hasText: "More" }).first().click();
@@ -102,13 +106,13 @@ await wait(1600);
 await check("the import reports what it wrote", await has("Register imported"));
 
 // 7 — the flat that could not register before, now can
-const after = await page.evaluate(async (api) => {
+const after = await page.evaluate(async ({ api, societyId }) => {
   const res = await fetch(`${api}/api/auth/register`, {
     method: "POST", headers: { "content-type": "application/json" },
-    body: JSON.stringify({ name: "Real Resident", flatCode: "B-1003", relation: "owner", phone: "9800000001", email: "resident@sunrise.in", password: "password123" }),
+    body: JSON.stringify({ name: "Real Resident", societyId, flatCode: "B-1003", relation: "owner", phone: "9800000001", email: "resident@sunrise.in", password: "password123" }),
   });
   return { status: res.status, body: await res.json() };
-}, API);
+}, { api: API, societyId });
 await check("a four-digit flat registers once it is on the register",
   after.status === 201 && after.body.status === "pending");
 
@@ -117,6 +121,26 @@ await page.locator("textarea").first().fill(CSV.split("\n").slice(0, 4).join("\n
 await tap("Check the file");
 await wait(1200);
 await check("re-importing the same file reports nothing to do", await has("already matches the register"));
+
+// 9 — a resident registering picks their society from the list
+await page.evaluate(() => { localStorage.clear(); sessionStorage.clear(); });
+await page.goto(URL, { waitUntil: "networkidle" });
+await wait(900);
+await tap("Register your flat");
+await wait(900);
+await check("the registration form asks which society", await has("Your society"));
+await check("the society is offered by name", await has("Sunrise Residency"));
+
+/* Submitting without choosing must not silently fall back to whichever
+   society happens to exist — that is exactly what broke with two. */
+await page.locator(".field", { hasText: "Full name" }).first().locator("input").fill("Picker Resident");
+await tap("Submit for approval");
+await wait(600);
+await check("choosing a society is required", await has("Choose your society"));
+
+await page.locator(".li", { hasText: "Sunrise Residency" }).first().click();
+await wait(300);
+await check("the chosen society is named against the flat field", await has("Checked against the flat register for Sunrise Residency"));
 
 await b.close();
 if (errors.length) { console.log("\nERRORS:\n" + [...new Set(errors)].join("\n")); process.exit(1); }

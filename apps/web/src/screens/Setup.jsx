@@ -11,7 +11,7 @@ import { api } from "../lib/api";
  * there is nothing to sign in to yet — no society, no flats, and no account
  * that could approve one.
  */
-export default function Setup({ onDone }) {
+export default function Setup({ onDone, onBack }) {
   const { refreshMe } = useApp();
   const [f, setF] = useState({
     name: "", address: "", regNo: "", gstin: "",
@@ -60,12 +60,17 @@ export default function Setup({ onDone }) {
   return (
     <div className="app">
       <div className="hdr">
-        <div className="hdr-row"><h1 className="grow">Set up your society</h1></div>
+        <div className="hdr-row">
+          {onBack && (
+            <button className="iconbtn ghost" onClick={onBack}><Icons.Back size={20} /></button>
+          )}
+          <h1 className="grow">Set up your society</h1>
+        </div>
       </div>
       <div className="body">
         <Alert kind="info" icon={Icons.Info}>
-          This database has no society yet. What you enter here creates it, along with the
-          first administrator account — the one that approves everyone else.
+          This creates the society and its first administrator account — the one that approves
+          everyone else. Residents can then find it by name when they register.
         </Alert>
 
         <p className="h4" style={{ margin: "4px 0 8px" }}>The society</p>
