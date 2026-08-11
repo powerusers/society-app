@@ -3,6 +3,7 @@ import cors from "cors";
 import helmet from "helmet";
 import rateLimit from "express-rate-limit";
 import { config } from "./config.js";
+import { forbidden } from "./lib/errors.js";
 import { authRouter } from "./routes/auth.js";
 import { meRouter } from "./routes/me.js";
 import { flatsRouter, registrationsRouter } from "./routes/flats.js";
@@ -26,7 +27,13 @@ export function createApp() {
     origin(origin, cb) {
       // same-origin and server-to-server calls arrive without an Origin header
       if (!origin || config.corsOrigins.includes(origin)) return cb(null, true);
-      cb(new Error(`Origin ${origin} is not allowed`));
+      /* Name both sides. A refusal that logs neither the origin nor the
+         allow-list turns a one-line misconfiguration into a stack trace the
+         browser reports only as a generic network failure. */
+      console.warn(
+        `[cors] refused ${origin} — CORS_ORIGIN allows: ${config.corsOrigins.join(", ") || "(nothing configured)"}`,
+      );
+      cb(forbidden(`Origin ${origin} is not allowed to call this API`));
     },
     credentials: true,
   }));

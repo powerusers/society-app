@@ -17,8 +17,11 @@ export const config = {
   jwtSecret: required("JWT_SECRET", isProd ? undefined : "dev-only-secret-not-for-production"),
   accessTtl: process.env.ACCESS_TTL || "15m",
   refreshTtlDays: Number(process.env.REFRESH_TTL_DAYS || 30),
+  /* A browser's Origin header never carries a trailing slash or a path, but the
+     value pasted into a dashboard usually does — so normalise rather than
+     refuse every request over a character nobody can see. */
   corsOrigins: (process.env.CORS_ORIGIN || "http://localhost:3000,http://127.0.0.1:3000")
-    .split(",").map((s) => s.trim()).filter(Boolean),
+    .split(",").map((s) => s.trim().replace(/\/+$/, "")).filter(Boolean),
   logLevel: process.env.LOG_LEVEL || (isProd ? "info" : "debug"),
 };
 
