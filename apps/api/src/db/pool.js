@@ -18,15 +18,35 @@ pg.types.setTypeParser(pg.types.builtins.DATE, (v) => v);
  * public internet gets TLS. `sslmode` in the URL, or PGSSLMODE, overrides
  * the guess in either direction.
  */
-export function sslFor(url) {
-  let host = "";
-  let mode = process.env.PGSSLMODE || "";
+export function databaseHost(url) {
   try {
-    const u = new URL(url);
-    host = u.hostname;
-    mode = u.searchParams.get("sslmode") || mode;
+    return new URL(url).hostname;
   } catch {
     /* An unparseable URL is the pool's problem to report, not ours. */
+    return "";
+  }
+}
+
+/**
+ * True only for a database on this machine.
+ *
+ * Destructive tooling keys off this rather than NODE_ENV, because the usual way
+ * to run a script against a deployed database is from a laptop — where NODE_ENV
+ * is not "production" and an environment-based guard would sit silently
+ * disabled at the exact moment it matters.
+ */
+export function isLocalDatabase(url = config.databaseUrl) {
+  const host = databaseHost(url);
+  return host === "localhost" || host === "127.0.0.1" || host === "::1";
+}
+
+export function sslFor(url) {
+  let mode = process.env.PGSSLMODE || "";
+  const host = databaseHost(url);
+  try {
+    mode = new URL(url).searchParams.get("sslmode") || mode;
+  } catch {
+    /* Handled by databaseHost above. */
   }
   if (mode === "disable") return undefined;
   if (mode) return { rejectUnauthorized: false };

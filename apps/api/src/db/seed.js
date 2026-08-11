@@ -1,7 +1,7 @@
 import { fileURLToPath } from "node:url";
 import { DEFAULT_HEADS, computeBill, currentCycle, shiftCycle, narrationFor, receiptNoFor } from "@gvs/shared";
 import { config } from "../config.js";
-import { pool, tx, closePool } from "./pool.js";
+import { pool, tx, closePool, isLocalDatabase, databaseHost } from "./pool.js";
 import { migrate } from "./migrate.js";
 import { hashPassword } from "../lib/password.js";
 
@@ -44,10 +44,11 @@ export async function seed({ silent = false } = {}) {
       /* This is not an upsert — it destroys every flat, bill, payment and
          audit row in the database. Harmless against a dev box, unrecoverable
          against a deployed one, so production has to say so out loud. */
-      if (config.isProd && process.env.SEED_CONFIRM !== "wipe") {
+      if ((config.isProd || !isLocalDatabase()) && process.env.SEED_CONFIRM !== "wipe") {
         throw new Error(
-          "Refusing to reseed: this database already holds a society, and seeding " +
-          "TRUNCATEs every table. Re-run with SEED_CONFIRM=wipe if that is genuinely what you want.",
+          `Refusing to reseed ${databaseHost(config.databaseUrl)}: it already holds a society, ` +
+          "and seeding TRUNCATEs every table — flats, bills, payments and the audit trail. " +
+          "Re-run with SEED_CONFIRM=wipe if that is genuinely what you want.",
         );
       }
       log("[seed] a society already exists — wiping and reseeding");
