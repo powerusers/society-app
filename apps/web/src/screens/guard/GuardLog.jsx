@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import Icons from "../../icons";
 import { Badge, Empty, SearchBar, Chips, Stat, Btn } from "../../components/ui";
-import { CAT, STATUS_COLOR } from "../../components/entities";
+import { CAT, CatTile, STATUS_COLOR } from "../../components/entities";
 import { useApp } from "../../store";
 import { fmtDateTime, fmtTime, dayKey, csv, download, minsBetween } from "../../lib/format";
 
@@ -44,7 +44,7 @@ export default function GuardLog() {
       </div>
       <Chips value={filter} onChange={setFilter} options={[
         { value: "all", label: "All" },
-        ...Object.entries(CAT).map(([k, v]) => ({ value: k, label: `${v.emoji} ${v.label}` })),
+        ...Object.entries(CAT).map(([k, v]) => ({ value: k, label: v.label })),
       ]} />
 
       <Btn size="sm" variant="ghost" icon={Icons.Download} onClick={exportCsv} style={{ marginBottom: 12 }}>Export CSV</Btn>
@@ -52,7 +52,7 @@ export default function GuardLog() {
       <div className="list">
         {rows.slice(0, 60).map((v) => (
           <div key={v.id} className="li">
-            <div className="ico-tile" style={{ fontSize: 18 }}>{(CAT[v.category] || CAT.guest).emoji}</div>
+            <CatTile category={v.category} />
             <div className="grow">
               <p className="h4 truncate">{v.name}</p>
               <p className="tiny" style={{ marginTop: 2 }}>

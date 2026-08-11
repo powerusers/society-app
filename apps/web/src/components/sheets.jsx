@@ -38,7 +38,7 @@ export function PreApproveSheet({ onClose, flatCode }) {
       </Alert>
       <Input label="Visitor name" placeholder="e.g. Kiran Deshpande / Swiggy" value={f.name} onChange={(e) => { u("name", e.target.value); setErr(""); }} />
       <Select label="Type" value={f.category} onChange={(e) => u("category", e.target.value)}
-        options={Object.entries(CAT).filter(([k]) => k !== "staff").map(([k, v]) => ({ value: k, label: `${v.emoji} ${v.label}` }))} />
+        options={Object.entries(CAT).filter(([k]) => k !== "staff").map(([k, v]) => ({ value: k, label: v.label }))} />
       <div style={{ display: "flex", gap: 10 }}>
         <div style={{ flex: 1 }}><Input label="Expected on" type="date" value={f.date} onChange={(e) => u("date", e.target.value)} /></div>
         <div style={{ flex: 1 }}>
@@ -142,7 +142,7 @@ export function PostNoticeSheet({ onClose }) {
           <div style={{ display: "flex", gap: 10 }}>
             <div style={{ flex: 1 }}>
               <Select label="Type" value={f.kind} onChange={(e) => u("kind", e.target.value)}
-                options={[{ value: "notice", label: "📋 Notice" }, { value: "event", label: "🎉 Event" }, { value: "payment", label: "💰 Payment" }, { value: "alert", label: "🚨 Alert" }]} />
+                options={[{ value: "notice", label: "Notice" }, { value: "event", label: "Event" }, { value: "payment", label: "Payment" }, { value: "alert", label: "Alert" }]} />
             </div>
             <div style={{ flex: 1 }}>
               <Select label="Priority" value={f.priority} onChange={(e) => u("priority", e.target.value)}

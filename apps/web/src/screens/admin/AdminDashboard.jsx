@@ -25,12 +25,12 @@ export default function AdminDashboard({ nav }) {
   const expense = db.ledger.filter((l) => l.type === "expense" && l.date.slice(0, 7) === cycle).reduce((s, l) => s + l.amount, 0);
 
   const actions = useMemo(() => [
-    drafts.length && { icon: Icons.Lock, label: `${drafts.length} bills await approval`, note: "Maker-checker — treasurer sign-off pending", to: "billing", tone: "purple" },
-    breached.length && { icon: Icons.AlertTri, label: `${breached.length} tickets past SLA`, note: "Residents can see the same clock", to: "helpdesk", tone: "red" },
-    pendingRegs.length && { icon: Icons.UserPlus, label: `${pendingRegs.length} registrations to verify`, note: "New owners and tenants awaiting access", to: "residents", tone: "amber" },
-    openIncidents.length && { icon: Icons.Shield, label: `${openIncidents.length} open incidents`, note: "Recorded by guards at the gate", to: "incidents", tone: "red" },
-    pendingBookings.length && { icon: Icons.Calendar, label: `${pendingBookings.length} amenity requests`, note: "Clubhouse and lawn need approval", to: "amenities", tone: "blue" },
-    unreconciled.length && { icon: Icons.Bank, label: `${unreconciled.length} receipts unreconciled`, note: "Import the MT940 statement to auto-match", to: "reconciliation", tone: "amber" },
+    drafts.length && { icon: Icons.Lock, label: `${drafts.length} bill${drafts.length > 1 ? "s" : ""} awaiting approval`, note: "Maker-checker — treasurer sign-off pending", to: "billing", tone: "purple" },
+    breached.length && { icon: Icons.AlertTri, label: `${breached.length} ticket${breached.length > 1 ? "s" : ""} past SLA`, note: "Residents can see the same clock", to: "helpdesk", tone: "red" },
+    pendingRegs.length && { icon: Icons.UserPlus, label: `${pendingRegs.length} registration${pendingRegs.length > 1 ? "s" : ""} to verify`, note: "New owners and tenants awaiting access", to: "residents", tone: "amber" },
+    openIncidents.length && { icon: Icons.Shield, label: `${openIncidents.length} open incident${openIncidents.length > 1 ? "s" : ""}`, note: "Recorded by guards at the gate", to: "incidents", tone: "red" },
+    pendingBookings.length && { icon: Icons.Calendar, label: `${pendingBookings.length} amenity request${pendingBookings.length > 1 ? "s" : ""}`, note: "Clubhouse and lawn need approval", to: "amenities", tone: "blue" },
+    unreconciled.length && { icon: Icons.Bank, label: `${unreconciled.length} receipt${unreconciled.length > 1 ? "s" : ""} unreconciled`, note: "Import the MT940 statement to auto-match", to: "reconciliation", tone: "amber" },
   ].filter(Boolean), [drafts, breached, pendingRegs, openIncidents, pendingBookings, unreconciled]);
 
   return (
@@ -64,7 +64,7 @@ export default function AdminDashboard({ nav }) {
           <div className="list">
             {actions.map((a) => (
               <div key={a.label} className="li tap" onClick={() => nav.go(a.to)}>
-                <div className="ico-tile" style={{ background: `var(--${a.tone}-bg)`, color: `var(--${a.tone})` }}><a.icon size={18} /></div>
+                <div className={`ico-tile ${a.tone}`}><a.icon size={18} /></div>
                 <div className="grow">
                   <p className="h4">{a.label}</p>
                   <p className="tiny" style={{ marginTop: 2 }}>{a.note}</p>

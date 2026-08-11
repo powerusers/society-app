@@ -212,7 +212,7 @@ function NewPostSheet({ onClose }) {
   return (
     <Sheet title="New community post" onClose={onClose}>
       <Select label="Type" value={f.type} onChange={(e) => u("type", e.target.value)}
-        options={[{ value: "discussion", label: "💬 Discussion" }, { value: "recommendation", label: "🙋 Ask for a recommendation" }, { value: "classified", label: "🏷️ Sell / give away" }]} />
+        options={[{ value: "discussion", label: "Discussion" }, { value: "recommendation", label: "Ask for a recommendation" }, { value: "classified", label: "Sell or give away" }]} />
       <Input label="Title" value={f.title} onChange={(e) => { u("title", e.target.value); setErr(""); }} placeholder="Short headline" />
       <TextArea label="Details" value={f.body} onChange={(e) => u("body", e.target.value)} />
       {f.type === "classified" && <Input label="Price (₹, 0 for free)" type="number" value={f.price} onChange={(e) => u("price", e.target.value)} />}

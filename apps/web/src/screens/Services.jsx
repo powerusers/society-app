@@ -1,6 +1,6 @@
 import { useState } from "react";
 import Icons from "../icons";
-import { Badge, Btn, Sheet, Alert, Input, TextArea, Empty } from "../components/ui";
+import { Badge, Btn, Sheet, Alert, Input, TextArea, Empty , EmojiTile} from "../components/ui";
 import { useApp } from "../store";
 import { inr, iso, fmtDate } from "../lib/format";
 
@@ -20,7 +20,7 @@ export default function Services() {
       {db.services.map((s) => (
         <div key={s.id} className="card tap" onClick={() => setOpen(s)}>
           <div className="row top">
-            <div className="ico-tile" style={{ fontSize: 21 }}>{s.emoji}</div>
+            <EmojiTile size="lg">{s.emoji}</EmojiTile>
             <div className="grow">
               <p className="h3">{s.name}</p>
               <p className="tiny" style={{ marginTop: 3 }}>{s.desc}</p>
@@ -41,7 +41,7 @@ export default function Services() {
           <div className="list">
             {requests.map((r) => (
               <div key={r.id} className="li">
-                <div className="ico-tile" style={{ fontSize: 19 }}>{db.services.find((s) => s.id === r.serviceId)?.emoji}</div>
+                <EmojiTile>{db.services.find((s) => s.id === r.serviceId)?.emoji}</EmojiTile>
                 <div className="grow">
                   <p className="h4">{r.serviceName}</p>
                   <p className="tiny" style={{ marginTop: 2 }}>Preferred {fmtDate(r.date)} · raised {fmtDate(r.at)}</p>
@@ -68,7 +68,7 @@ export default function Services() {
 function RequestSheet({ s, onClose, onSubmit }) {
   const [f, setF] = useState({ date: new Date(Date.now() + 3 * 864e5).toISOString().slice(0, 10), note: "" });
   return (
-    <Sheet title={`${s.emoji} ${s.name}`} onClose={onClose}>
+    <Sheet title={s.name} onClose={onClose}>
       <p className="muted" style={{ marginBottom: 12 }}>{s.desc}</p>
       <div className="card flat">
         <div className="row"><span className="muted">Starting at</span><b>{inr(s.from)}</b></div>

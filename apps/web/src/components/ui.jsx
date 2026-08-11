@@ -90,9 +90,16 @@ export const Chips = ({ value, onChange, options }) => (
   </div>
 );
 
-export const Avatar = ({ name, size, emoji, color }) => (
+export const Avatar = ({ name, size, color }) => (
   <div className={`avatar ${size === "lg" ? "lg" : ""}`} style={{ background: color || avatarColor(name) }}>
-    {emoji || initials(name)}
+    {initials(name)}
+  </div>
+);
+
+/** Emoji belongs to illustrative content (an amenity, a service), never to structure. */
+export const EmojiTile = ({ children, size }) => (
+  <div className="ico-tile plain" style={size === "lg" ? { width: 44, height: 44, fontSize: 21, borderRadius: "var(--r-md)" } : undefined}>
+    {children}
   </div>
 );
 
@@ -112,10 +119,35 @@ export const Alert = ({ kind = "info", icon: I = Icons.Info, children }) => (
 
 export const Empty = ({ icon: I = Icons.Box, title, note, action }) => (
   <div className="card empty">
-    <I size={34} style={{ color: "var(--line2)", marginBottom: 8 }} />
+    <div className="ico-tile plain" style={{ width: 44, height: 44, margin: "0 auto 12px", borderRadius: "var(--r-md)" }}>
+      <I size={20} />
+    </div>
     <p className="h4">{title}</p>
-    {note && <p className="tiny" style={{ marginTop: 4 }}>{note}</p>}
-    {action && <div style={{ marginTop: 14 }}>{action}</div>}
+    {note && <p className="tiny" style={{ marginTop: 5, maxWidth: 280, marginInline: "auto" }}>{note}</p>}
+    {action && <div style={{ marginTop: 16 }}>{action}</div>}
+  </div>
+);
+
+/** Placeholder rows for a list that is still loading from the API. */
+export const SkeletonList = ({ rows = 4 }) => (
+  <div className="list">
+    {Array.from({ length: rows }, (_, i) => (
+      <div className="skel-row" key={i}>
+        <div className="skel" style={{ width: 36, height: 36, borderRadius: "var(--r-sm)" }} />
+        <div className="grow">
+          <div className="skel skel-line" style={{ width: `${55 + ((i * 13) % 30)}%` }} />
+          <div className="skel skel-line" style={{ width: "35%", height: 9, marginBottom: 0 }} />
+        </div>
+      </div>
+    ))}
+  </div>
+);
+
+export const SkeletonCard = () => (
+  <div className="card">
+    <div className="skel skel-line" style={{ width: "45%", height: 13 }} />
+    <div className="skel skel-line" style={{ width: "85%" }} />
+    <div className="skel skel-line" style={{ width: "70%", marginBottom: 0 }} />
   </div>
 );
 
@@ -173,7 +205,7 @@ export const SearchBar = ({ value, onChange, placeholder = "Search…" }) => (
 
 export const Row = ({ icon: I, emoji, avatar, title, sub, meta, right, onClick, badge }) => (
   <div className={`li ${onClick ? "tap" : ""}`} onClick={onClick} role={onClick ? "button" : undefined}>
-    {avatar ? <Avatar name={avatar} emoji={emoji} /> : I ? <div className="ico-tile"><I size={19} /></div> : emoji ? <div className="ico-tile" style={{ fontSize: 19 }}>{emoji}</div> : null}
+    {avatar ? <Avatar name={avatar} /> : I ? <div className="ico-tile"><I size={18} /></div> : emoji ? <EmojiTile>{emoji}</EmojiTile> : null}
     <div className="grow">
       <p className="h4 truncate">{title}</p>
       {sub && <p className="tiny" style={{ marginTop: 2 }}>{sub}</p>}

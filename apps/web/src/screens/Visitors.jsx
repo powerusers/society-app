@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import Icons from "../icons";
 import { Badge, Btn, Empty, Segmented, Stat, Alert, Sheet, TextArea } from "../components/ui";
-import { VisitorCard, ApproveDeny, CAT, overstay } from "../components/entities";
+import { VisitorCard, ApproveDeny, CatTile, overstay } from "../components/entities";
 import { PreApproveSheet, GatePassSheet } from "../components/sheets";
 import { useApp } from "../store";
 import { useActions } from "../store/actions";
@@ -81,7 +81,7 @@ export default function Visitors({ nav }) {
         <div className="list">
           {history.slice(0, 40).map((v) => (
             <div key={v.id} className="li">
-              <div className="ico-tile" style={{ fontSize: 18 }}>{(CAT[v.category] || CAT.guest).emoji}</div>
+              <CatTile category={v.category} />
               <div className="grow">
                 <p className="h4 truncate">{v.name}</p>
                 <p className="tiny" style={{ marginTop: 2 }}>

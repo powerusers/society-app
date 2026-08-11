@@ -1,7 +1,7 @@
 import { useState } from "react";
 import Icons from "../../icons";
 import { Badge, Btn, Empty, Stat, Alert, Sheet, Input, Select, TextArea, Chips } from "../../components/ui";
-import { VisitorCard, overstay, CAT } from "../../components/entities";
+import { VisitorCard, overstay, CAT, catOf } from "../../components/entities";
 import QR from "../../lib/qr";
 import { useApp } from "../../store";
 import { useActions } from "../../store/actions";
@@ -71,7 +71,7 @@ export default function GuardGate({ nav }) {
 
       {waiting.length > 0 && (
         <>
-          <div className="sect"><h2 className="h2">⏳ At the gate</h2></div>
+          <div className="sect"><h2 className="h2">At the gate</h2></div>
           {waiting.map((v) => (
             <VisitorCard key={v.id} v={v} accent="#FF9800" actions={operate && <>
               <Btn size="sm" icon={Icons.Send} onClick={() => A.sendToFlat(v)}>Send to flat</Btn>
@@ -83,7 +83,7 @@ export default function GuardGate({ nav }) {
 
       {pending.length > 0 && (
         <>
-          <div className="sect"><h2 className="h2">📲 Waiting on the flat</h2></div>
+          <div className="sect"><h2 className="h2">Waiting on the flat</h2></div>
           {pending.map((v) => (
             <VisitorCard key={v.id} v={v} accent="#1565C0" actions={<div className="alert warn" style={{ marginBottom: 0, width: "100%" }}>
               <span className="blink" />
@@ -95,7 +95,7 @@ export default function GuardGate({ nav }) {
 
       {cleared.length > 0 && (
         <>
-          <div className="sect"><h2 className="h2">✅ Cleared — let in</h2></div>
+          <div className="sect"><h2 className="h2">Cleared for entry</h2></div>
           {cleared.map((v) => (
             <VisitorCard key={v.id} v={v} accent="#43A047" actions={operate && <>
               <Btn size="sm" icon={Icons.Check} onClick={() => A.admitVisitor(v)}>Allow entry</Btn>
@@ -107,7 +107,7 @@ export default function GuardGate({ nav }) {
 
       {inside.length > 0 && (
         <>
-          <div className="sect"><h2 className="h2">🏠 Inside the building</h2></div>
+          <div className="sect"><h2 className="h2">Inside the building</h2></div>
           {inside.map((v) => {
             const o = overstay(v, db.settings.overstayMins);
             return (
@@ -147,11 +147,11 @@ function EntrySheet({ gateId, onClose }) {
       <Alert kind="info">A request goes to the flat for approval. Nothing enters without the resident's yes — or a valid pre-approved pass.</Alert>
       <button className="dashed" style={{ marginBottom: 13, padding: 20 }} onClick={() => u("photo", !f.photo)}>
         <Icons.Camera size={22} style={{ display: "block", margin: "0 auto 6px" }} />
-        {f.photo ? "Photo captured ✓ — tap to retake" : "Capture visitor photo"}
+        {f.photo ? "Photo captured — tap to retake" : "Capture visitor photo"}
       </button>
       <Input label="Visitor name" value={f.name} onChange={(e) => { u("name", e.target.value); setErr(""); }} placeholder="e.g. Ramesh Kumar / Amazon" />
       <Select label="Type" value={f.category} onChange={(e) => u("category", e.target.value)}
-        options={Object.entries(CAT).map(([k, v]) => ({ value: k, label: `${v.emoji} ${v.label}` }))} />
+        options={Object.entries(CAT).map(([k, v]) => ({ value: k, label: v.label }))} />
       <Select label="Visiting flat" value={f.flatCode} onChange={(e) => u("flatCode", e.target.value)}
         options={db.flats.map((x) => ({ value: x.code, label: `Flat ${x.code}` }))} />
       <Input label="Mobile" type="tel" value={f.phone} onChange={(e) => u("phone", e.target.value)} placeholder="Optional" />
@@ -208,7 +208,7 @@ function ScanSheet({ gateId, onClose }) {
             <div className="hairline" />
             <div className="row"><span className="muted">Flat</span><b>{found.flatCode}</b></div>
             <div className="hairline" />
-            <div className="row"><span className="muted">Type</span><b>{(CAT[found.category] || CAT.guest).label}</b></div>
+            <div className="row"><span className="muted">Type</span><b>{catOf(found.category).label}</b></div>
             <div className="hairline" />
             <div className="row"><span className="muted">In-building limit</span><b>{found.allowedMins || db.settings.overstayMins} min</b></div>
           </div>

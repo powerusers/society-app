@@ -30,13 +30,13 @@ export default function Login() {
   if (mode === "register") return <Register onBack={() => setMode("login")} add={add} say={say} flats={db.flats} />;
 
   return (
-    <div className="app" style={{ background: "linear-gradient(180deg,#1B4D3E 0%,#2D7A5F 42%,#F8F6F1 100%)", padding: "44px 20px 32px" }}>
-      <div style={{ textAlign: "center", marginBottom: 26 }}>
-        <div style={{ width: 70, height: 70, background: "rgba(255,255,255,.16)", borderRadius: 20, display: "inline-flex", alignItems: "center", justifyContent: "center", marginBottom: 14 }}>
-          <Icons.Building size={34} style={{ color: "#fff" }} />
+    <div className="app" style={{ background: "linear-gradient(165deg,var(--b700) 0%,var(--b800) 55%,var(--b900) 100%)", padding: "48px 20px 36px" }}>
+      <div style={{ textAlign: "center", marginBottom: 28 }}>
+        <div style={{ width: 62, height: 62, background: "rgba(255,255,255,.1)", border: "1px solid rgba(255,255,255,.14)", borderRadius: "var(--r-lg)", display: "inline-flex", alignItems: "center", justifyContent: "center", marginBottom: 16 }}>
+          <Icons.Building size={28} style={{ color: "#fff" }} />
         </div>
-        <h1 style={{ color: "#fff", fontSize: 25, fontWeight: 800, margin: "0 0 4px", letterSpacing: "-.5px" }}>{db.settings.societyName}</h1>
-        <p style={{ color: "rgba(255,255,255,.72)", fontSize: 13, margin: 0 }}>Gate · Community · Accounts, in one app</p>
+        <h1 className="h1" style={{ color: "#fff" }}>{db.settings.societyName}</h1>
+        <p style={{ color: "rgba(255,255,255,.55)", fontSize: 13, margin: "6px 0 0" }}>Gate · Community · Accounts, in one app</p>
       </div>
 
       <div className="card">
@@ -58,21 +58,21 @@ export default function Login() {
         </p>
       </div>
 
-      <p style={{ textAlign: "center", fontSize: 10.5, color: "rgba(255,255,255,.65)", margin: "20px 0 10px", textTransform: "uppercase", letterSpacing: 1.2, fontWeight: 700 }}>
+      <p style={{ textAlign: "center", fontSize: 10, color: "rgba(255,255,255,.4)", margin: "24px 0 12px", textTransform: "uppercase", letterSpacing: ".08em", fontWeight: 600 }}>
         Quick demo access
       </p>
-      <div style={{ display: "grid", gap: 8 }}>
+      <div style={{ display: "grid", gap: 7 }}>
         {DEMOS.map((d) => (
           <button key={d.id} onClick={() => login(d.id)}
-            style={{ padding: "12px 13px", borderRadius: 13, border: "1.5px solid rgba(255,255,255,.22)", background: "rgba(255,255,255,.1)", cursor: "pointer", display: "flex", alignItems: "center", gap: 11, textAlign: "left", backdropFilter: "blur(6px)" }}>
-            <div style={{ width: 38, height: 38, borderRadius: 11, background: "rgba(255,255,255,.15)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-              <d.icon size={19} style={{ color: "#fff" }} />
+            style={{ padding: "11px 12px", borderRadius: "var(--r-md)", border: "1px solid rgba(255,255,255,.12)", background: "rgba(255,255,255,.07)", display: "flex", alignItems: "center", gap: 11, textAlign: "left" }}>
+            <div style={{ width: 34, height: 34, borderRadius: "var(--r-sm)", background: "rgba(255,255,255,.1)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+              <d.icon size={17} style={{ color: "rgba(255,255,255,.85)" }} />
             </div>
             <div className="grow">
-              <span style={{ fontSize: 13.5, fontWeight: 700, color: "#fff", display: "block" }}>{d.label}</span>
-              <span style={{ fontSize: 11, color: "rgba(255,255,255,.66)" }}>{d.desc}</span>
+              <span style={{ fontSize: 13, fontWeight: 600, color: "#fff", display: "block" }}>{d.label}</span>
+              <span style={{ fontSize: 11.5, color: "rgba(255,255,255,.5)" }}>{d.desc}</span>
             </div>
-            <Icons.Fwd size={16} style={{ color: "rgba(255,255,255,.5)" }} />
+            <Icons.Fwd size={15} style={{ color: "rgba(255,255,255,.32)" }} />
           </button>
         ))}
       </div>

@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import Icons from "../icons";
-import { Badge, Btn, Empty, Sheet, Segmented, Input, TextArea, Alert, Stat } from "../components/ui";
+import { Badge, Btn, Empty, Sheet, Segmented, Input, TextArea, Alert, Stat , EmojiTile} from "../components/ui";
 import { useApp } from "../store";
 import { useActions } from "../store/actions";
 import { inr, fmtDate, dayKey } from "../lib/format";
@@ -30,7 +30,7 @@ export default function Amenities() {
             return (
               <div key={a.id} className="card tap" onClick={() => setOpen(a)}>
                 <div className="row top">
-                  <div className="ico-tile" style={{ fontSize: 21 }}>{a.emoji}</div>
+                  <EmojiTile size="lg">{a.emoji}</EmojiTile>
                   <div className="grow">
                     <p className="h3">{a.name}</p>
                     <p className="tiny" style={{ marginTop: 3 }}>Capacity {a.capacity} · {a.slots.length} slots a day</p>
@@ -56,7 +56,7 @@ export default function Amenities() {
             return (
               <div key={c.id} className="card">
                 <div className="row top">
-                  <div className="ico-tile" style={{ fontSize: 21 }}>{c.emoji}</div>
+                  <EmojiTile size="lg">{c.emoji}</EmojiTile>
                   <div className="grow">
                     <p className="h3">{c.name}</p>
                     <p className="tiny" style={{ marginTop: 3 }}>{c.trainer} · {c.days} · {c.time}</p>
@@ -88,7 +88,7 @@ export default function Amenities() {
                     <div className="grow">
                       <p className="h3">{sel.amenity(b.amenityId)?.name}</p>
                       <p className="tiny" style={{ marginTop: 3 }}>{b.flatCode} · {fmtDate(b.date)} · {b.slot} · {b.guests} guests</p>
-                      {b.note && <p className="tiny" style={{ marginTop: 3 }}>📝 {b.note}</p>}
+                      {b.note && <p className="tiny" style={{ marginTop: 3 }}>{b.note}</p>}
                     </div>
                     <Badge color="amber">{inr(b.amount)}</Badge>
                   </div>
@@ -105,7 +105,7 @@ export default function Amenities() {
           <div className="list">
             {myBookings.map((b) => (
               <div key={b.id} className="li">
-                <div className="ico-tile" style={{ fontSize: 19 }}>{sel.amenity(b.amenityId)?.emoji}</div>
+                <EmojiTile>{sel.amenity(b.amenityId)?.emoji}</EmojiTile>
                 <div className="grow">
                   <p className="h4">{sel.amenity(b.amenityId)?.name}</p>
                   <p className="tiny" style={{ marginTop: 2 }}>{fmtDate(b.date)} · {b.slot} · {inr(b.amount)}</p>
@@ -143,14 +143,14 @@ function BookSheet({ a, onClose, onBook }) {
   const taken = db.bookings.filter((b) => b.amenityId === a.id && b.date === f.date && b.status !== "cancelled").map((b) => b.slot);
 
   return (
-    <Sheet title={`${a.emoji} ${a.name}`} onClose={onClose}>
+    <Sheet title={a.name} onClose={onClose}>
       <div className="card flat">
         <div className="row"><span className="muted">Capacity</span><b>{a.capacity}</b></div>
         <div className="hairline" />
         <div className="row"><span className="muted">Charge</span><b>{a.charge ? inr(a.charge) : "Free"}</b></div>
         {a.deposit > 0 && <><div className="hairline" /><div className="row"><span className="muted">Refundable deposit</span><b>{inr(a.deposit)}</b></div></>}
       </div>
-      <p className="hint" style={{ marginBottom: 14 }}>📋 {a.rules}</p>
+      <p className="hint" style={{ marginBottom: 14 }}>{a.rules}</p>
 
       <Input label="Date" type="date" value={f.date} min={dayKey()} onChange={(e) => u("date", e.target.value)} />
       <p className="field"><label>Slot</label></p>

@@ -31,7 +31,7 @@ export default function Vehicles() {
       <div className="list">
         {mine.map((v) => (
           <div key={v.id} className="li">
-            <div className="ico-tile" style={{ fontSize: 19 }}>{v.kind === "Car" ? "🚗" : "🏍️"}</div>
+            <div className="ico-tile"><Icons.Car size={18} /></div>
             <div className="grow">
               <p className="h4">{v.model}</p>
               <p className="tiny" style={{ marginTop: 2 }}>{v.number} · Slot {v.slot} · Sticker {v.sticker}</p>
@@ -83,7 +83,7 @@ function AddVehicle({ onClose, onAdd }) {
   return (
     <Sheet title="Add a vehicle" onClose={onClose}>
       <Select label="Type" value={f.kind} onChange={(e) => u("kind", e.target.value)}
-        options={[{ value: "Car", label: "🚗 Four wheeler" }, { value: "Bike", label: "🏍️ Two wheeler" }, { value: "EV", label: "⚡ Electric vehicle" }]} />
+        options={[{ value: "Car", label: "Four wheeler" }, { value: "Bike", label: "Two wheeler" }, { value: "EV", label: "Electric vehicle" }]} />
       <Input label="Make & model" value={f.model} onChange={(e) => { u("model", e.target.value); setErr(""); }} placeholder="e.g. Maruti Swift" />
       <Input label="Registration number" value={f.number} onChange={(e) => u("number", e.target.value.toUpperCase())} placeholder="MH-12-AB-1234" />
       <Input label="Parking slot" value={f.slot} onChange={(e) => u("slot", e.target.value)} placeholder="e.g. P1-42" />

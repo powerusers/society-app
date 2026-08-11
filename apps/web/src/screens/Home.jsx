@@ -1,6 +1,6 @@
 import { useState } from "react";
 import Icons from "../icons";
-import { Badge, Btn, Stat, Alert, Empty } from "../components/ui";
+import { Badge, Btn, Stat, Alert, Empty , EmojiTile} from "../components/ui";
 import { NoticeCard, VisitorCard, ApproveDeny, QuickAction, OverstayPill, HelpRow } from "../components/entities";
 import { PreApproveSheet, RaiseTicketSheet } from "../components/sheets";
 import { useApp } from "../store";
@@ -89,7 +89,7 @@ export default function Home({ nav }) {
         <QuickAction icon={Icons.Calendar} label={"Book an\namenity"} onClick={() => nav.go("amenities")} />
         <QuickAction icon={Icons.Users} label={"Daily help\n& staff"} onClick={() => nav.go("dailyHelp")} />
         <QuickAction icon={Icons.Car} label={"Vehicles &\nparking"} onClick={() => nav.go("vehicles")} />
-        <QuickAction icon={Icons.Phone} label={"Emergency\ncontacts"} onClick={() => nav.go("emergency")} tint={{ bg: "var(--red-bg)", fg: "var(--red)" }} />
+        <QuickAction icon={Icons.Phone} label={"Emergency\ncontacts"} onClick={() => nav.go("emergency")} tone="red" />
       </div>
 
       {/* committee snapshot */}
@@ -176,7 +176,7 @@ export default function Home({ nav }) {
           <div className="list">
             {myBookings.map((b) => (
               <div key={b.id} className="li">
-                <div className="ico-tile" style={{ fontSize: 19 }}>{sel.amenity(b.amenityId)?.emoji}</div>
+                <EmojiTile>{sel.amenity(b.amenityId)?.emoji}</EmojiTile>
                 <div className="grow">
                   <p className="h4">{sel.amenity(b.amenityId)?.name}</p>
                   <p className="tiny" style={{ marginTop: 2 }}>{fmtDate(b.date)} · {b.slot}</p>

@@ -60,7 +60,7 @@ export default function Residents() {
                 <div className="grow" style={{ marginLeft: 11 }}>
                   <p className="h3">{r.name}</p>
                   <p className="tiny" style={{ marginTop: 3 }}>Flat {r.flatCode} · {r.relation} · applied {ago(r.at)}</p>
-                  <p className="tiny" style={{ marginTop: 2 }}>📱 {r.phone} · 📧 {r.email}</p>
+                  <p className="tiny" style={{ marginTop: 3 }}>{r.phone} · {r.email}</p>
                   <div className="wrap" style={{ marginTop: 6 }}>
                     {(r.docs || []).map((d) => <Badge key={d} color="blue">{d}</Badge>)}
                     {!r.docs?.length && <Badge color="amber">No documents attached</Badge>}
