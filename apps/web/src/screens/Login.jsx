@@ -3,6 +3,7 @@ import Icons from "../icons";
 import { Btn, Input, Select, Alert, SearchBar, SkeletonList } from "../components/ui";
 import { useApp } from "../store";
 import Setup from "./Setup";
+import { APP_NAME, APP_TAGLINE } from "../lib/brand";
 import { api, isLive } from "../lib/api";
 import { iso } from "../lib/format";
 
@@ -48,13 +49,15 @@ export default function Login() {
         <div style={{ width: 62, height: 62, background: "rgba(255,255,255,.1)", border: "1px solid rgba(255,255,255,.14)", borderRadius: "var(--r-lg)", display: "inline-flex", alignItems: "center", justifyContent: "center", marginBottom: 16 }}>
           <Icons.Building size={28} style={{ color: "#fff" }} />
         </div>
-        <h1 className="h1" style={{ color: "#fff" }}>{db.settings.societyName}</h1>
-        <p style={{ color: "rgba(255,255,255,.55)", fontSize: 13, margin: "6px 0 0" }}>Gate · Community · Accounts, in one app</p>
+        {/* The platform's name, not a society's. Nobody has a society yet at
+            this point, and the demo seed's one is not an answer. */}
+        <h1 className="h1" style={{ color: "#fff" }}>{APP_NAME}</h1>
+        <p style={{ color: "rgba(255,255,255,.55)", fontSize: 13, margin: "6px 0 0" }}>{APP_TAGLINE}</p>
       </div>
 
       <div className="card">
         <h2 className="h3" style={{ marginBottom: 16 }}>Sign in</h2>
-        <Input label="Email" type="email" value={email} placeholder="you@greenvalley.in" autoComplete="username"
+        <Input label="Email" type="email" value={email} placeholder="you@example.com" autoComplete="username"
           onChange={(e) => { setEmail(e.target.value); setErr(""); }}
           onKeyDown={(e) => e.key === "Enter" && submit()} />
         <div style={{ position: "relative" }}>
