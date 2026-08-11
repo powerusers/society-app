@@ -109,9 +109,13 @@ export default function StaffMgmt() {
       )}
 
       {sheet && <AddStaff onClose={() => setSheet(false)} onSave={(f) => {
+        /* Derived from the society, not from a fixed domain: one society's
+           address does not belong on another society's staff. */
+        const domain = String(db.settings.societyName || "society")
+          .toLowerCase().replace(/[^a-z0-9]+/g, "").slice(0, 24) || "society";
         const u = add("users", {
           id: uid("u"), ...f, status: "active", joined: iso(), notify: {},
-          email: `${f.name.toLowerCase().replace(/\s+/g, ".")}@greenvalley.in`,
+          email: `${f.name.toLowerCase().replace(/\s+/g, ".")}@${domain}.in`,
         });
         logAudit("staff.add", u.name, f.designation || f.role);
         say(`${u.name} added with a ${f.role} login.`);

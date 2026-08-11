@@ -2,6 +2,7 @@ import { useState } from "react";
 import Icons from "../icons";
 import { Btn, Input, Alert } from "../components/ui";
 import { useApp } from "../store";
+import { APP_NAME } from "../lib/brand";
 import { api } from "../lib/api";
 
 /**
@@ -69,8 +70,9 @@ export default function Setup({ onDone, onBack }) {
       </div>
       <div className="body">
         <Alert kind="info" icon={Icons.Info}>
-          This creates the society and its first administrator account — the one that approves
-          everyone else. Residents can then find it by name when they register.
+          This brings your society onto {APP_NAME}. It creates the society and its first
+          administrator account — the one that approves everyone else. Residents can then
+          find it by name when they register.
         </Alert>
 
         <p className="h4" style={{ margin: "4px 0 8px" }}>The society</p>
