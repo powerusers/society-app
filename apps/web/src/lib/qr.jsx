@@ -10,7 +10,7 @@ export default function QR({ value, size = 168, caption }) {
       width: size * 2,
       margin: 1,
       errorCorrectionLevel: "M",
-      color: { dark: "#1B4D3E", light: "#FFFFFF" },
+      color: { dark: "#14171C", light: "#FFFFFF" },
     })
       .then((d) => alive && setSrc(d))
       .catch(() => alive && setSrc(""));
