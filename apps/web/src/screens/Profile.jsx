@@ -13,6 +13,12 @@ const NOTIFY = [
   { key: "quietHours", label: "Quiet hours (10 PM – 7 AM)", desc: "Hold non-urgent alerts overnight. Gate and SOS always ring." },
 ];
 
+/* Kept separate from the notification list on purpose: this one publishes data
+   to neighbours, and must never be bundled with an alerts preference. */
+const PRIVACY = [
+  { key: "shareContact", label: "Show my number in the directory", desc: "Off by default. The committee can always see it." },
+];
+
 export default function Profile({ nav }) {
   const { db, me, sel, patch, say } = useApp();
   const [edit, setEdit] = useState(false);
@@ -84,6 +90,13 @@ export default function Profile({ nav }) {
           <div key={n.key} style={i ? { borderTop: "1px solid var(--line)" } : undefined}>
             <Toggle on={!!me.notify?.[n.key]} onChange={(v) => setNotify(n.key, v)} label={n.label} desc={n.desc} />
           </div>
+        ))}
+      </div>
+
+      <div className="sect"><h2 className="h2">Privacy</h2></div>
+      <div className="card">
+        {PRIVACY.map((n) => (
+          <Toggle key={n.key} on={!!me.notify?.[n.key]} onChange={(v) => setNotify(n.key, v)} label={n.label} desc={n.desc} />
         ))}
       </div>
 

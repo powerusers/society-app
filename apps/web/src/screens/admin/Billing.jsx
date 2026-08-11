@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import Icons from "../../icons";
 import { Badge, Btn, Empty, Sheet, Segmented, SearchBar, Stat, Alert, Confirm, Select } from "../../components/ui";
+import { canApproveRun } from "@gvs/shared";
 import { useApp } from "../../store";
 import { useActions } from "../../store/actions";
 import { inr, lakh, cycleLabel, fmtDate, thisCycle, shiftCycle, pct, csv, download } from "../../lib/format";
@@ -37,9 +38,10 @@ export default function Billing() {
   }, [runBills, tab, q]);
 
   const isMaker = can("billing.make");
-  // Separation of duties: whoever prepared the run cannot also approve it.
-  const preparedByMe = drafts.length > 0 && drafts[0].makerId === me.id;
-  const isChecker = can("billing.approve") && !preparedByMe;
+  // Separation of duties, decided by the same shared rule the API enforces.
+  const approval = drafts.length ? canApproveRun(me, drafts[0]) : { ok: false, reason: "no_drafts" };
+  const preparedByMe = approval.reason === "maker_is_checker";
+  const isChecker = approval.ok;
 
   const applyLateFees = () => {
     let n = 0;

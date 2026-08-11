@@ -1,4 +1,7 @@
 import { useMemo } from "react";
+import {
+  computeBill as computeBillShared, narrationFor, receiptNoFor, settlementDueAt, slaDueAt,
+} from "@gvs/shared";
 import { useApp } from "./index";
 import { code6, iso, uid, thisCycle, shiftCycle } from "../lib/format";
 
@@ -86,10 +89,7 @@ export function useActions() {
     };
 
     /* ---------------- helpdesk ---------------- */
-    const slaFor = (priority) => {
-      const hrs = db.settings.slaHours[priority] ?? 24;
-      return new Date(Date.now() + hrs * 3600e3).toISOString();
-    };
+    const slaFor = (priority) => slaDueAt(priority, db.settings.slaHours).toISOString();
 
     const raiseTicket = (data) => {
       const n = db.tickets.length + 2045;
@@ -145,21 +145,11 @@ export function useActions() {
     };
 
     /* ---------------- billing / accounts ---------------- */
-    const computeBill = (flat, cycle) => {
+    /* Preview only. When the API is wired in, the amount a resident is charged is
+       whatever the server computed with this same shared function. */
+    const computeBill = (flat) => {
       const slots = db.vehicles.filter((v) => v.flatCode === flat.code).length || (flat.type === "3BHK" ? 2 : 1);
-      const items = [];
-      for (const h of db.heads) {
-        let amt = 0;
-        if (h.basis === "per_sqft") amt = Math.round(flat.area * h.rate);
-        else if (h.basis === "flat") amt = h.rate;
-        else if (h.basis === "per_slot") amt = h.rate * slots;
-        else if (h.basis === "tenant_only") amt = flat.occupancy === "tenant" ? h.rate : 0;
-        if (!amt) continue;
-        items.push({ headId: h.id, name: h.name, amount: amt, gst: Math.round((amt * h.gst) / 100) });
-      }
-      const subtotal = items.reduce((s, i) => s + i.amount, 0);
-      const gst = items.reduce((s, i) => s + i.gst, 0);
-      return { items, subtotal, gst, total: subtotal + gst };
+      return computeBillShared(flat, db.heads, slots);
     };
 
     /** Maker step — creates a draft run awaiting the treasurer's approval. */
@@ -168,7 +158,7 @@ export function useActions() {
       const drafts = db.flats
         .filter((f) => !existing.has(f.code))
         .map((f) => {
-          const { items, subtotal, gst, total } = computeBill(f, cycle);
+          const { items, subtotal, gst, total } = computeBill(f);
           return {
             id: `bill_${f.code}_${cycle}`, cycle, flatCode: f.code, items, subtotal, gst, lateFee: 0, total,
             dueDate: `${cycle}-10`, status: "pending-approval", makerId: me.id, createdAt: iso(),
@@ -203,13 +193,13 @@ export function useActions() {
     /** Payment + the 30-minute instant settlement promise from the deck. */
     const payBill = (bill, mode = "UPI") => {
       const paidAt = new Date();
-      const settleAt = new Date(paidAt.getTime() + db.settings.settlementMins * 60e3);
-      const receiptNo = `RCT-${bill.cycle.replace("-", "")}-${bill.flatCode}`;
+      const settleAt = settlementDueAt(paidAt, db.settings.settlementMins);
+      const receiptNo = receiptNoFor(bill);
       const p = add("payments", {
         billId: bill.id, flatCode: bill.flatCode, amount: bill.total, mode,
         txnId: `T${Date.now().toString().slice(-10)}`, paidAt: paidAt.toISOString(),
         settledAt: settleAt.toISOString(), reconciled: false,
-        narration: `${mode.toUpperCase()}/CR/GVS/${bill.flatCode}/${bill.cycle.replace("-", "")}`,
+        narration: narrationFor({ mode, flatCode: bill.flatCode, cycle: bill.cycle }),
         receiptNo,
       });
       patch("bills", bill.id, { status: "paid", paidAt: paidAt.toISOString() });

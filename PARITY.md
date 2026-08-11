@@ -59,14 +59,17 @@ high-value slots; an SOS panic flow that broadcasts to every gate.
 
 ## What is genuinely not done
 
-The app is a complete frontend against seeded local data. To run a real society
-on it, these need building:
+The web app is a complete frontend against seeded local data. A backend now
+exists alongside it (`apps/api`) with real auth and server-enforced
+authorization, but the two are not connected yet. To run a real society on this,
+these need building:
 
-1. **Backend and real auth** — the data lives in `localStorage`, so it is
-   per-device and there is no password check. Needs an API, a database and
-   session management.
-2. **Payment gateway** — the payment flow is modelled end to end but calls no
-   gateway, and no money moves.
+1. **Wiring the web app to the API** — screens still read and write
+   `localStorage`. The API covers auth, the gate lifecycle, billing with
+   maker-checker, and the helpdesk; those screens migrate first. Notices, polls,
+   amenities, documents and the incident/patrol writes have no endpoints yet.
+2. **Payment gateway** — the pay endpoint records a payment, a receipt and a
+   ledger entry, but calls no gateway and moves no money.
 3. **Push notifications** — approvals currently surface in-app only; gate
    requests need real push to be useful.
 4. **Hardware** — biometric readers, plate recognition, boom barriers and the

@@ -6,3 +6,6 @@ dist
 .env.*
 
 .shots
+
+# api
+apps/api/.env

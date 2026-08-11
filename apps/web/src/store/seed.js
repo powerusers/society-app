@@ -1,3 +1,4 @@
+import { DEFAULT_HEADS, computeBill, narrationFor, receiptNoFor } from "@gvs/shared";
 import { dayKey, shiftCycle, thisCycle, code6 } from "../lib/format";
 
 /* Deterministic PRNG so the first seed is reproducible across devices. */
@@ -105,32 +106,7 @@ function buildPeople() {
 }
 
 /* ---------------- billing ---------------- */
-const HEADS = [
-  { id: "h_maint", name: "Maintenance charges", basis: "per_sqft", rate: 3.2, gst: 0 },
-  { id: "h_water", name: "Water charges", basis: "flat", rate: 320, gst: 0 },
-  { id: "h_sink", name: "Sinking fund", basis: "flat", rate: 450, gst: 0 },
-  { id: "h_repair", name: "Repair fund", basis: "flat", rate: 300, gst: 0 },
-  { id: "h_park", name: "Parking charges", basis: "per_slot", rate: 200, gst: 0 },
-  { id: "h_club", name: "Clubhouse & amenities", basis: "flat", rate: 250, gst: 18 },
-  { id: "h_ngc", name: "Non-occupancy charges", basis: "tenant_only", rate: 400, gst: 0 },
-];
-
-function billFor(flat, cycle, slots) {
-  const items = [];
-  for (const h of HEADS) {
-    let amt = 0;
-    if (h.basis === "per_sqft") amt = Math.round(flat.area * h.rate);
-    else if (h.basis === "flat") amt = h.rate;
-    else if (h.basis === "per_slot") amt = h.rate * slots;
-    else if (h.basis === "tenant_only") amt = flat.occupancy === "tenant" ? h.rate : 0;
-    if (!amt) continue;
-    const gst = Math.round((amt * h.gst) / 100);
-    items.push({ headId: h.id, name: h.name, amount: amt, gst });
-  }
-  const sub = items.reduce((s, i) => s + i.amount, 0);
-  const gst = items.reduce((s, i) => s + i.gst, 0);
-  return { items, sub, gst, total: sub + gst };
-}
+const HEADS = DEFAULT_HEADS;
 
 function buildFinance(flats) {
   const cur = thisCycle();
@@ -143,7 +119,7 @@ function buildFinance(flats) {
     const isCurrent = ci === cycles.length - 1;
     for (const f of flats) {
       const slots = f.type === "3BHK" ? 2 : 1;
-      const { items, sub, gst, total } = billFor(f, cycle, slots);
+      const { items, subtotal, gst, total } = computeBill(f, HEADS, slots);
       const dueDate = `${cycle}-10`;
       const overdue = !isCurrent && chance(0.09);
       // The demo resident always has the current cycle open, so the pay + settle flow is visible.
@@ -151,7 +127,7 @@ function buildFinance(flats) {
       const id = `bill_${f.code}_${cycle}`;
       const lateFee = overdue ? Math.round(total * 0.02) : 0;
       bills.push({
-        id, cycle, flatCode: f.code, items, subtotal: sub, gst, lateFee, total: total + lateFee,
+        id, cycle, flatCode: f.code, items, subtotal, gst, lateFee, total: total + lateFee,
         dueDate, status: paid ? "paid" : overdue ? "overdue" : "issued",
         makerId: "u_stf", approvedBy: "u_com", approvedAt: `${cycle}-01T10:12:00.000Z`,
         issuedAt: `${cycle}-01T11:00:00.000Z`,
@@ -166,8 +142,8 @@ function buildFinance(flats) {
           id: pid, billId: id, flatCode: f.code, amount: total, mode,
           txnId: `T${cycle.replace("-", "")}${String(int(100000, 999999))}`,
           paidAt: at, settledAt: new Date(new Date(at).getTime() + int(9, 28) * 60e3).toISOString(),
-          narration: `UPI/CR/GVS/${f.code}/${cycle.replace("-", "")}`,
-          receiptNo: `RCT-${cycle.replace("-", "")}-${f.code}`,
+          narration: narrationFor({ mode, flatCode: f.code, cycle }),
+          receiptNo: receiptNoFor({ cycle, flatCode: f.code }),
           // Current-cycle credits are still sitting in the bank feed, waiting for the MT940 import.
           reconciled: !isCurrent,
         });

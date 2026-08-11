@@ -1,4 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { can as canDo } from "@gvs/shared";
 import { buildSeed } from "./seed";
 import { uid, iso } from "../lib/format";
 
@@ -19,17 +20,6 @@ const load = () => {
 const Ctx = createContext(null);
 export const useApp = () => useContext(Ctx);
 
-/* Role capability matrix. Everything in the app asks `can()` rather than
-   testing role strings, so adding a role later stays a one-line change. */
-const CAPS = {
-  admin: ["*"],
-  committee: ["notice.write", "poll.write", "billing.make", "billing.approve", "helpdesk.manage", "resident.approve",
-    "amenity.manage", "accounts.view", "accounts.write", "document.write", "staff.manage", "gate.view", "reports.view", "settings.view"],
-  staff: ["helpdesk.manage", "billing.make", "gate.view", "document.write", "amenity.manage", "reports.view"],
-  guard: ["gate.operate", "incident.write", "patrol.write", "gate.view"],
-  resident: [],
-};
-
 export function AppProvider({ children }) {
   const [db, setDb] = useState(load);
   const [session, setSession] = useState(() => {
@@ -46,11 +36,9 @@ export function AppProvider({ children }) {
   const me = useMemo(() => db.users.find((u) => u.id === session?.userId) || null, [db.users, session]);
   const role = me?.role || null;
 
-  const can = useCallback((cap) => {
-    if (!role) return false;
-    const list = CAPS[role] || [];
-    return list.includes("*") || list.includes(cap);
-  }, [role]);
+  /* Capability checks come from @gvs/shared, the same table the API enforces.
+     This copy only decides what to render — the server re-checks every request. */
+  const can = useCallback((cap) => canDo(role, cap), [role]);
 
   /* ---- generic collection writers ---- */
   const setColl = useCallback((coll, fn) => setDb((d) => ({ ...d, [coll]: fn(d[coll] || []) })), []);
