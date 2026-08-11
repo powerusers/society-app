@@ -166,7 +166,7 @@ function Register({ onBack }) {
                     options={(db.settings.blocks || ["A", "B", "C", "D", "E"]).map((b) => ({ value: b, label: `Block ${b}` }))} />
                 </div>
                 <div style={{ flex: 1 }}>
-                  <Input label="Flat no." value={f.flatNo} error={fieldErr.flatCode} onChange={(e) => u("flatNo", e.target.value)} placeholder="e.g. 401" />
+                  <Input label="Flat no." value={f.flatNo} error={fieldErr.flatCode} onChange={(e) => u("flatNo", e.target.value)} placeholder="e.g. 401 or 1003" />
                 </div>
               </div>
               <Select label="I am the" value={f.relation} onChange={(e) => u("relation", e.target.value)}

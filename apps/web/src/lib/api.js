@@ -88,7 +88,7 @@ async function refreshSession() {
   return refreshing;
 }
 
-async function request(method, path, { body, retry = true, signal } = {}) {
+async function request(method, path, { body, retry = true, signal, headers } = {}) {
   if (!BASE) throw new ApiError(0, { error: { code: "offline", message: "No API is configured" } });
 
   const res = await fetch(`${BASE}${path}`, {
@@ -97,13 +97,14 @@ async function request(method, path, { body, retry = true, signal } = {}) {
     headers: {
       ...(body !== undefined ? { "content-type": "application/json" } : {}),
       ...(accessToken ? { authorization: `Bearer ${accessToken}` } : {}),
+      ...headers,
     },
     body: body !== undefined ? JSON.stringify(body) : undefined,
   });
 
   // An expired access token is recoverable exactly once per request.
   if (res.status === 401 && retry && getRefreshToken()) {
-    if (await refreshSession()) return request(method, path, { body, retry: false, signal });
+    if (await refreshSession()) return request(method, path, { body, retry: false, signal, headers });
   }
 
   if (res.status === 204) return null;
@@ -138,6 +139,21 @@ export const api = {
 
   async register(payload) {
     return request("POST", "/api/auth/register", { body: payload, retry: false });
+  },
+
+  /** Whether this instance still needs its society created. */
+  async setupStatus() {
+    return request("GET", "/api/setup/status", { retry: false });
+  },
+
+  /** First-run bootstrap. Signs the new administrator in on success. */
+  async setup(payload, token) {
+    const data = await request("POST", "/api/setup", {
+      body: payload, retry: false, headers: { "x-setup-token": token },
+    });
+    setTokens(data);
+    announce("login");
+    return data;
   },
 
   async logout() {

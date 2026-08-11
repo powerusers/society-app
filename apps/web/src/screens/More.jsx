@@ -65,6 +65,7 @@ export default function More({ nav }) {
       items: [
         { id: "dashboard", icon: Icons.Grid, label: "Committee dashboard", tab: true },
         { id: "residents", icon: Icons.Building, label: "Residents & flats", badge: pendingRegs || null },
+        { id: "flatRegister", icon: Icons.Upload, label: "Flat register", show: can("settings.write") },
         { id: "staffMgmt", icon: Icons.Shield, label: "Society staff" },
         { id: "audit", icon: Icons.Lock, label: "Audit trail" },
         { id: "settings", icon: Icons.Settings, label: "Society settings" },
@@ -94,7 +95,10 @@ export default function More({ nav }) {
         <div key={g.title}>
           <div className="sect"><h2 className="h2">{g.title}</h2></div>
           <div className="list">
-            {g.items.map((it) => (
+            {/* `show` is optional per item: absent means visible, so only the
+                entries that opt into a narrower capability than their group
+                are filtered here. */}
+            {g.items.filter((it) => it.show !== false).map((it) => (
               <div key={it.id} className="li tap" onClick={() => (it.tab ? nav.switchTab(it.id) : nav.go(it.id))}>
                 <div className="ico-tile" style={it.danger ? { background: "var(--red-bg)", color: "var(--red)" } : undefined}>
                   <it.icon size={18} />

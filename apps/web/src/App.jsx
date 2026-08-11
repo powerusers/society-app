@@ -2,11 +2,13 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { CSS, ACCENTS, applyAccent } from "./styles";
 import Icons from "./icons";
 import { AppProvider, useApp } from "./store";
+import { api } from "./lib/api";
 import { Toast } from "./components/ui";
 import { useVisitors } from "./data/visitors";
 import { useTickets } from "./data/tickets";
 
 import Login from "./screens/Login";
+import Setup from "./screens/Setup";
 import Home from "./screens/Home";
 import Community from "./screens/Community";
 import Visitors from "./screens/Visitors";
@@ -37,6 +39,7 @@ import Budget from "./screens/admin/Budget";
 import Reports from "./screens/admin/Reports";
 import Audit from "./screens/admin/Audit";
 import Residents from "./screens/admin/Residents";
+import FlatRegister from "./screens/admin/FlatRegister";
 import StaffMgmt from "./screens/admin/StaffMgmt";
 import SocietySettings from "./screens/admin/SocietySettings";
 
@@ -72,6 +75,7 @@ const SCREENS = {
   reports: { title: "Reports", comp: Reports },
   audit: { title: "Audit Trail", comp: Audit },
   residents: { title: "Residents & Flats", comp: Residents },
+  flatRegister: { title: "Flat Register", comp: FlatRegister },
   staffMgmt: { title: "Society Staff", comp: StaffMgmt },
   settings: { title: "Society Settings", comp: SocietySettings },
 };
@@ -220,12 +224,31 @@ function SosOverlay({ onClose, db }) {
 }
 
 function Root() {
-  const { me, booting, db } = useApp();
+  const { me, booting, db, live } = useApp();
   /* The accent is a society setting, not a constant — the app is not themed
      after whatever the society happens to be called. */
   useEffect(() => { applyAccent(db.settings.accent); }, [db.settings.accent]);
-  if (booting) return <Booting />;
-  return me ? <Shell /> : <Login />;
+
+  /* A live instance with no society has nothing to sign in to, so offer setup
+     instead of a login form nobody can satisfy. Only asked once per load, and
+     only when signed out — demo mode always has its seeded society. */
+  const [needsSetup, setNeedsSetup] = useState(false);
+  const [checked, setChecked] = useState(!live);
+  useEffect(() => {
+    if (!live || me) return;
+    let alive = true;
+    api.setupStatus()
+      .then((s) => alive && setNeedsSetup(Boolean(s?.needsSetup)))
+      /* If the check itself fails the login screen is the safer fallback: it
+         reports the connection error, where setup would imply a fresh install. */
+      .catch(() => {})
+      .finally(() => alive && setChecked(true));
+    return () => { alive = false; };
+  }, [live, me]);
+
+  if (booting || !checked) return <Booting />;
+  if (me) return <Shell />;
+  return needsSetup ? <Setup onDone={() => setNeedsSetup(false)} /> : <Login />;
 }
 
 /** Shown only while a stored session is being resumed against the API. */

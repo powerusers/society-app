@@ -10,7 +10,17 @@ import {
 
 /** Request payload schemas. The API validates with these; forms reuse them for client-side checks. */
 
-const flatCode = z.string().regex(/^[A-Z]-\d{3}$/, "Flat code looks like A-401");
+/* Deliberately loose. Three digits is one society's numbering, not a rule —
+   a tenth-floor flat is 1003 in most towers, and blocks are sometimes two
+   letters. The authority on whether a flat exists is the society's register,
+   which the API checks and reports precisely; a format rule any tighter than
+   this rejects real flats before that check can run.
+   The message names the field the user is actually typing in, since the form
+   collects the block separately and cannot accept "A-401" in that box. */
+const flatCode = z.string().regex(
+  /^[A-Z]{1,2}-\d{1,4}[A-Z]?$/,
+  "Flat number should be 1–4 digits, like 401 or 1003",
+);
 const phone = z.string().regex(/^\d{10}$/, "Enter a 10-digit mobile number");
 const cycle = z.string().regex(/^\d{4}-\d{2}$/, "Cycle looks like 2026-08");
 
@@ -30,6 +40,30 @@ export const registrationSchema = z.object({
   phone,
   email: z.string().email(),
   password: z.string().min(8, "Password must be at least 8 characters"),
+});
+
+/** First-run bootstrap: the society, and the one account that can administer it. */
+export const setupSchema = z.object({
+  society: z.object({
+    name: z.string().trim().min(2, "Society name is required").max(160),
+    address: z.string().trim().max(240).optional().default(""),
+    regNo: z.string().trim().max(80).optional().default(""),
+    gstin: z.string().trim().max(20).optional().default(""),
+  }),
+  admin: z.object({
+    name: z.string().trim().min(2, "Your name is required").max(120),
+    email: z.string().email(),
+    phone: phone.optional().or(z.literal("")),
+    /* Longer than the resident minimum on purpose: this one account can read
+       every flat's dues and approve every registration in the society. */
+    password: z.string().min(12, "Use at least 12 characters for the administrator account"),
+    designation: z.string().trim().max(60).optional().default("Secretary"),
+  }),
+});
+
+export const importFlatsSchema = z.object({
+  csv: z.string().min(1, "Paste or upload a CSV first").max(2_000_000),
+  mode: z.enum(["preview", "apply"]).default("preview"),
 });
 
 export const createVisitorSchema = z.object({

@@ -2,7 +2,7 @@
   "$schema": "https://railway.com/railway.schema.json",
   "build": {
     "builder": "NIXPACKS",
-    "buildCommand": "npm install --include=dev --no-audit --no-fund && npm run build --workspace @gvs/web"
+    "buildCommand": "PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 npm install --include=dev --no-audit --no-fund && npm run build --workspace @gvs/web"
   },
   "deploy": {
     "startCommand": "npx serve apps/web/dist -l $PORT -s",

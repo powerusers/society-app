@@ -26,6 +26,10 @@ export const config = {
     // them verbatim and the mismatch is invisible in the UI.
     .map((s) => s.trim().replace(/^["']|["']$/g, "").trim().replace(/\/+$/, ""))
     .filter(Boolean),
+  /* Gates first-run setup. Unset means setup is refused outright rather than
+     left open — on a public URL an unguarded bootstrap hands administrator
+     rights to whoever finds it first. */
+  setupToken: process.env.SETUP_TOKEN || "",
   logLevel: process.env.LOG_LEVEL || (isProd ? "info" : "debug"),
 };
 
