@@ -30,11 +30,19 @@ npm install
 npm run dev:web    # http://localhost:3000
 npm run build      # production bundle into apps/web/dist
 
-# API — needs Postgres
+# API — needs Postgres, and S3 for the document vault
 cp apps/api/.env.example apps/api/.env
 createdb gvs_dev && npm run migrate && npm run seed
 npm run dev:api    # http://localhost:4000
 ```
+
+Documents are stored in S3 and never pass through the API server: the browser
+uploads with a presigned POST and downloads with a short-lived presigned GET.
+Without `S3_BUCKET` set the API still runs — only the document endpoints return
+503. See [apps/api/README.md](./apps/api/README.md) for the bucket and IAM setup.
+
+Online payment collection is deliberately out of scope for this phase. Recording
+a receipt against a bill works; a gateway is phase 2.
 
 The web app still runs entirely on its own seeded local data; it does not call
 the API yet. Migrating it screen by screen is the next step.

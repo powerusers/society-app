@@ -61,6 +61,48 @@ database ending in `_test`, because the suite truncates every table.
 | `DELETE` | `/api/bills/runs/:cycle` | Discards drafts |
 | `POST` | `/api/bills/:id/pay` | Payment + ledger entry in one transaction |
 | `GET/POST/PATCH` | `/api/tickets` … | SLA set from priority; staff close their own |
+| `GET` | `/api/documents` | Committee-only files absent from a resident's response |
+| `POST` | `/api/documents/upload-url` | Presigned POST for a direct-to-S3 upload |
+| `POST` | `/api/documents/:id/complete` | Confirms the object landed, records its real size |
+| `GET` | `/api/documents/:id/download` | Short-lived presigned GET, forced to `attachment` |
+| `DELETE` | `/api/documents/:id` | Removes the row and the object |
+| `POST` | `/api/documents/sweep` | Clears abandoned uploads, admin only |
+
+## Document storage (S3)
+
+Bytes never pass through this server. Uploading is two calls:
+
+1. `POST /api/documents/upload-url` — validates the name, category, content type
+   and declared size, writes a `pending` row, and returns a **presigned POST**.
+2. The browser posts the returned fields plus the file straight to S3.
+3. `POST /api/documents/:id/complete` — the server calls `HeadObject` to confirm
+   the object exists and records the size S3 actually received, not the size the
+   client claimed. Only then does the document become `ready` and appear in lists.
+
+Downloads are a presigned GET issued per request, after the authorization check,
+valid for two minutes.
+
+Things worth keeping true if you change this:
+
+- **The object key is built server-side** from the society id and the new
+  document's id: `societies/{societyId}/documents/{documentId}/{safeName}`.
+  Nothing the client sends reaches the key unsanitised, so a crafted filename
+  cannot escape the prefix or reach another society's files.
+- **The size limit and the content type are signed policy conditions**, so S3
+  itself refuses a body that violates them. Validating only in the API would
+  check what the client said it was about to upload, not what it uploaded.
+- **The content type is an allowlist.** HTML and SVG are excluded because they
+  execute script when a browser renders them. Downloads are additionally forced
+  to `Content-Disposition: attachment`, so nothing renders inline from the
+  bucket's origin even if a file is mislabelled.
+- **The bucket is private.** No public reads, no bucket policy for anonymous
+  access. In production, attach an IAM role rather than setting keys; it needs
+  only `PutObject`, `GetObject`, `DeleteObject` and `HeadObject` on
+  `<bucket>/societies/*`.
+
+`S3_ENDPOINT` and `S3_FORCE_PATH_STYLE` point the client at a local
+S3-compatible server; the tests use them to run the real presigned flow against
+an in-process one.
 
 ## Decisions worth knowing
 
@@ -87,9 +129,22 @@ approves and the bill the resident receives are the same function.
 every query filters on the caller's. One society today; the model does not need
 rewriting for the second.
 
+## Payments — phase 2
+
+There is no payment gateway and none is planned for this phase. What exists is
+receipt recording: `POST /api/bills/:id/pay` writes a payment, a receipt number,
+a flat-wise bank narration and the matching ledger entry, in one transaction.
+That is what a treasurer needs to book a cheque, a cash payment or a NEFT credit
+that arrived out of band, and it is genuinely useful without a gateway.
+
+What phase 2 adds on top: an online collection flow (gateway checkout, webhook
+confirmation, idempotency keys on the webhook, refunds and chargeback handling)
+and the real settlement timing. Until then `settled_at` is computed from the
+society's configured window rather than reported by a processor — the column is
+a projection, not a fact, and no screen should present it as confirmed.
+
 ## Not built yet
 
-Payment gateway (the pay endpoint records a payment, it does not move money),
-push notifications, file storage for documents, the MT940 bank feed, amenity
-bookings, notices and polls, and the incident/patrol write endpoints. The gate,
-helpdesk and billing paths are the ones the web app will migrate onto first.
+Push notifications, the MT940 bank feed, amenity bookings, notices and polls,
+and the incident/patrol write endpoints. The gate, helpdesk, documents and
+billing paths are the ones the web app will migrate onto first.

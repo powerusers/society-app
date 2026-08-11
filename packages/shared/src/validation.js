@@ -4,6 +4,9 @@ import {
   TICKET_STATUSES, TICKET_SOURCES, PAYMENT_MODES, RELATIONS,
   INCIDENT_TYPES, SEVERITIES,
 } from "./entities.js";
+import {
+  DOCUMENT_CATEGORIES, DOCUMENT_VISIBILITY, MAX_DOCUMENT_BYTES, isAllowedContentType,
+} from "./documents.js";
 
 /** Request payload schemas. The API validates with these; forms reuse them for client-side checks. */
 
@@ -93,12 +96,23 @@ export const createIncidentSchema = z.object({
   gateId: z.string().optional(),
 });
 
+export const requestUploadSchema = z.object({
+  name: z.string().trim().min(1).max(160),
+  fileName: z.string().trim().min(1).max(200),
+  category: z.enum(DOCUMENT_CATEGORIES),
+  visibility: z.enum(DOCUMENT_VISIBILITY).default("residents"),
+  contentType: z.string().refine(isAllowedContentType, "That file type is not accepted"),
+  /** Declared up front so an oversized file is refused before a byte is uploaded. */
+  sizeBytes: z.number().int().positive().max(MAX_DOCUMENT_BYTES, "File is larger than the 25 MB limit"),
+});
+
 export const listQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(200).default(50),
   offset: z.coerce.number().int().min(0).default(0),
   status: z.string().optional(),
   flatCode: z.string().optional(),
   cycle: z.string().optional(),
+  category: z.string().optional(),
 });
 
 /** Flattens a ZodError into `{ field: message }` for form display. */

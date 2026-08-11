@@ -55,6 +55,10 @@ resident marketplace and discussion forum; a masked resident directory; a
 document vault; amenity **and** class bookings with committee approval for
 high-value slots; an SOS panic flow that broadcasts to every gate.
 
+The document vault is the one piece with a real backend behind it already: files
+live in S3, uploaded and downloaded through short-lived presigned URLs so bytes
+never pass through the API server. The web screen is not wired to it yet.
+
 ---
 
 ## What is genuinely not done
@@ -66,10 +70,15 @@ these need building:
 
 1. **Wiring the web app to the API** — screens still read and write
    `localStorage`. The API covers auth, the gate lifecycle, billing with
-   maker-checker, and the helpdesk; those screens migrate first. Notices, polls,
-   amenities, documents and the incident/patrol writes have no endpoints yet.
-2. **Payment gateway** — the pay endpoint records a payment, a receipt and a
-   ledger entry, but calls no gateway and moves no money.
+   maker-checker, the helpdesk and the document vault; those screens migrate
+   first. Notices, polls, amenities and the incident/patrol writes have no
+   endpoints yet.
+2. **Online payment collection — deferred to phase 2 by decision.** Receipt
+   recording works today: a payment writes a receipt, a flat-wise bank narration
+   and a ledger entry in one transaction, which covers cheques, cash and NEFT
+   credits booked by the treasurer. Gateway checkout, webhook confirmation and
+   real settlement timing are phase 2. Until then the settlement time shown is
+   computed from the society's configured window, not reported by a processor.
 3. **Push notifications** — approvals currently surface in-app only; gate
    requests need real push to be useful.
 4. **Hardware** — biometric readers, plate recognition, boom barriers and the
@@ -77,7 +86,6 @@ these need building:
 5. **Telephony** — for the AI voice helpdesk.
 6. **Bank feed** — the MT940 import parses a real statement format, but a live
    feed has to be arranged with the bank.
-7. **File storage** — uploaded documents are recorded as metadata, not stored.
 
 The commercial gap in the deck — ₹5.73 lakh over ten years — is a vendor pricing
 question, not a feature question, and nothing here changes it.

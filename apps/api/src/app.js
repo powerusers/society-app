@@ -9,6 +9,7 @@ import { flatsRouter, registrationsRouter } from "./routes/flats.js";
 import { visitorsRouter } from "./routes/visitors.js";
 import { billsRouter } from "./routes/bills.js";
 import { ticketsRouter } from "./routes/tickets.js";
+import { documentsRouter } from "./routes/documents.js";
 import { errorHandler, notFoundHandler } from "./middleware/errorHandler.js";
 import { pool } from "./db/pool.js";
 
@@ -55,6 +56,7 @@ export function createApp() {
   app.use("/api/visitors", visitorsRouter);
   app.use("/api/bills", billsRouter);
   app.use("/api/tickets", ticketsRouter);
+  app.use("/api/documents", documentsRouter);
 
   app.use(notFoundHandler);
   app.use(errorHandler);
