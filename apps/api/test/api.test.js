@@ -157,6 +157,29 @@ describe("authorization", () => {
     const me = body.residents.find((x) => x.flat === "A-401" && x.relation === "owner");
     assert.match(me.phone, /^\d{10}$/);
   });
+
+  /* The directory screen renders from these two fields rather than inspecting
+     the phone string for bullet characters, so they have to agree with the
+     masking or the UI will offer to dial a masked number. */
+  test("the response states whether a contact was withheld", async () => {
+    const { body } = await get("/api/me/directory", resident.accessToken);
+    for (const person of body.residents) {
+      assert.equal(
+        person.contactHidden, /••••/.test(person.phone || "") || !person.phone,
+        `contactHidden disagrees with the masking for ${person.name}`,
+      );
+    }
+  });
+
+  test("an address is withheld under the same consent as a number", async () => {
+    const asResident = await get("/api/me/directory", resident.accessToken);
+    const asCommittee = await get("/api/me/directory", treasurer.accessToken);
+    const pick = (r, flat) => r.body.residents.find((x) => x.flat === flat);
+
+    assert.equal(pick(asResident, "D-101").email, null, "no opt-in means no address either");
+    assert.match(pick(asCommittee, "D-101").email, /@/, "the committee sees it");
+    assert.match(pick(asResident, "D-102").email, /@/, "an opted-in resident shares both");
+  });
 });
 
 /* ----------------------------------------------------------------- gate */
