@@ -12,6 +12,7 @@ import { deflateSync } from "node:zlib";
 import { writeFile, mkdir } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { MARK_PATH, MARK_STROKE, MARK_CROP } from "../src/lib/mark.js";
 
 /* A canvas always hands back RGBA, and App Store Connect rejects an icon that
    carries an alpha channel even when every pixel in it is opaque. Rather than
@@ -78,14 +79,11 @@ function encodeRgbPng(rgba, width, height) {
 
 const PUBLIC = join(dirname(fileURLToPath(import.meta.url)), "..", "public");
 
-/* The mark: one unbroken rounded-square outline, corners closed, with a single
-   gap centred on the bottom edge — the boundary of the premises, and the gate.
-   Centreline square 452px, corner radius 112, stroke 72, on a 1024 canvas. The
-   gap is 180px of centreline, which the round caps close to 108px visible —
-   1.5x the stroke, wide enough to still read at 32px. */
-const PATH = "M602 744 H626 A112 112 0 0 0 738 632 V404 A112 112 0 0 0 626 292 " +
-  "H398 A112 112 0 0 0 286 404 V632 A112 112 0 0 0 398 744 H422";
-const STROKE = 72;
+/* The same geometry the app renders on its sign-in screen. Imported rather
+   than restated, so an edit to the mark cannot reach the UI and miss the
+   favicon, or the reverse. */
+const PATH = MARK_PATH;
+const STROKE = MARK_STROKE;
 
 const INK = "#14171C";
 const ACCENT = "#2D4EA2";
@@ -102,7 +100,7 @@ const tile = (ground, mark) =>
 
 /* A favicon is never masked, so the mark is cropped close instead of carrying
    the launcher safe-area padding — at 16px that padding is most of the icon. */
-const CROP = "224 230 576 576";
+const CROP = MARK_CROP;
 
 /* Transparent, and it follows the browser chrome rather than assuming a light
    tab strip. Safari ignores the media query and takes the first rule, which is

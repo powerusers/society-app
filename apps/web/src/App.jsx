@@ -4,6 +4,7 @@ import Icons from "./icons";
 import { AppProvider, useApp } from "./store";
 import { api } from "./lib/api";
 import { Toast } from "./components/ui";
+import { Mark } from "./components/Mark";
 import { useVisitors } from "./data/visitors";
 import { useTickets } from "./data/tickets";
 
@@ -257,7 +258,7 @@ function Booting() {
     <div className="app" style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100vh" }}>
       <div className="center">
         <div style={{ width: 52, height: 52, borderRadius: "var(--r-lg)", background: "var(--accent-soft)", color: "var(--b600)", display: "inline-flex", alignItems: "center", justifyContent: "center", marginBottom: 14 }}>
-          <Icons.Building size={24} />
+          <Mark size={26} />
         </div>
         <p className="muted">Restoring your session…</p>
       </div>

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import Icons from "../icons";
 import { Btn, Input, Alert } from "../components/ui";
+import { Mark } from "../components/Mark";
 import { useApp } from "../store";
 import { APP_NAME } from "../lib/brand";
 import { api } from "../lib/api";
@@ -65,6 +66,7 @@ export default function Setup({ onDone, onBack }) {
           {onBack && (
             <button className="iconbtn ghost" onClick={onBack}><Icons.Back size={20} /></button>
           )}
+          <Mark size={22} style={{ color: "var(--accent)", flexShrink: 0 }} />
           <h1 className="grow">Set up your society</h1>
         </div>
       </div>
