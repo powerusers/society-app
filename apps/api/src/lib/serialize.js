@@ -18,14 +18,22 @@ export const publicUser = (u) => u && ({
 });
 
 /** Directory listing: phone is masked unless the viewer is allowed to see it. */
-export const directoryUser = (u, revealPhone) => ({
+export const directoryUser = (u, revealContact) => ({
   id: u.id,
   name: u.name,
   flat: u.flat_code ?? null,
   relation: u.relation,
   role: u.role,
   designation: u.designation,
-  phone: revealPhone ? u.phone : maskPhone(u.phone),
+  joined: u.created_at,
+  phone: revealContact ? u.phone : maskPhone(u.phone),
+  /* Stated rather than inferred. Without it the client has to guess from the
+     bullet characters whether a number is real, and a wrong guess either hides
+     a number the resident chose to share or offers to dial a masked one. */
+  contactHidden: !revealContact,
+  /* An address is as identifying as a number, so it is withheld under the same
+     consent rather than masked into something half-readable. */
+  email: revealContact ? u.email : null,
 });
 
 export const maskPhone = (p) => (p && p.length >= 4 ? `${p.slice(0, 2)}••••${p.slice(-2)}` : "");
