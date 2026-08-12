@@ -33,18 +33,31 @@ export default function Home({ nav }) {
   return (
     <>
       {/* dues / welcome */}
-      <div className="panel">
-        <p className="tiny">{dues ? "Outstanding" : "Nothing outstanding"}</p>
-        <p className="h1" style={{ marginTop: 6 }}>{inr(dues)}</p>
-        <p className="tiny" style={{ marginTop: 6 }}>
-          {dueBill ? `${cycleLabel(dueBill.cycle)} · due ${fmtDate(dueBill.dueDate)}` : `Flat ${flat} is fully paid up.`}
-        </p>
-        {dueBill && (
-          <Btn variant="white" block style={{ marginTop: 14 }} onClick={() => nav.switchTab("payments")}>
-            Pay {inr(dueBill.total)}
-          </Btn>
-        )}
-      </div>
+      {/* A committee member or administrator need not live here. Showing them a
+          dues panel for a flat they do not have produced "Flat null is fully
+          paid up" on the first screen after sign-in. */}
+      {flat ? (
+        <div className="panel">
+          <p className="tiny">{dues ? "Outstanding" : "Nothing outstanding"}</p>
+          <p className="h1" style={{ marginTop: 6 }}>{inr(dues)}</p>
+          <p className="tiny" style={{ marginTop: 6 }}>
+            {dueBill ? `${cycleLabel(dueBill.cycle)} · due ${fmtDate(dueBill.dueDate)}` : `Flat ${flat} is fully paid up.`}
+          </p>
+          {dueBill && (
+            <Btn variant="white" block style={{ marginTop: 14 }} onClick={() => nav.switchTab("payments")}>
+              Pay {inr(dueBill.total)}
+            </Btn>
+          )}
+        </div>
+      ) : (
+        <div className="panel">
+          <p className="tiny">Signed in as</p>
+          <p className="h1" style={{ marginTop: 6 }}>{me.name}</p>
+          <p className="tiny" style={{ marginTop: 6 }}>
+            {[me.designation, db.settings.societyName].filter(Boolean).join(" · ")}
+          </p>
+        </div>
+      )}
 
       {/* live gate activity */}
       {pending.length > 0 && (
@@ -78,8 +91,11 @@ export default function Home({ nav }) {
       {/* quick actions */}
       <div className="sect"><h2 className="h2">Quick actions</h2></div>
       <div className="grid2">
-        <QuickAction icon={Icons.UserPlus} label={"Pre-approve\nvisitor"} onClick={() => setSheet("pre")} />
-        <QuickAction icon={Icons.Ticket} label={"Raise a\ncomplaint"} onClick={() => setSheet("ticket")} />
+        {/* Both of these raise something against a flat, and the server refuses
+            a caller who is not a member of one — so they are offered only to
+            someone who has a flat to raise them for. */}
+        {flat && <QuickAction icon={Icons.UserPlus} label={"Pre-approve\nvisitor"} onClick={() => setSheet("pre")} />}
+        {flat && <QuickAction icon={Icons.Ticket} label={"Raise a\ncomplaint"} onClick={() => setSheet("ticket")} />}
         <QuickAction icon={Icons.Calendar} label={"Book an\namenity"} onClick={() => nav.go("amenities")} />
         <QuickAction icon={Icons.Users} label={"Daily help\n& staff"} onClick={() => nav.go("dailyHelp")} />
         <QuickAction icon={Icons.Car} label={"Vehicles &\nparking"} onClick={() => nav.go("vehicles")} />
