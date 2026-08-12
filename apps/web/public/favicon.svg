@@ -1,1 +1,7 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#14171C" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="224 230 576 576">
+  <style>
+    .m { stroke: #14171C }
+    @media (prefers-color-scheme: dark) { .m { stroke: #FFFFFF } }
+  </style>
+  <path class="m" d="M602 744 H626 A112 112 0 0 0 738 632 V404 A112 112 0 0 0 626 292 H398 A112 112 0 0 0 286 404 V632 A112 112 0 0 0 398 744 H422" fill="none" stroke-width="72" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
