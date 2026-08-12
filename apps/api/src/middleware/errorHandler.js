@@ -9,6 +9,10 @@ function fromPgError(err) {
       if (err.constraint === "payments_bill_id_key") return new AppError(409, "conflict", "This bill has already been paid");
       if (err.constraint === "users_society_id_email_key") return new AppError(409, "conflict", "That email is already registered");
       if (err.constraint === "visitors_active_pass_idx") return new AppError(409, "conflict", "That pass code is already in use");
+      /* Two residents tapping the same slot in the same second: one of them
+         arrives here, and gets told rather than being shown a booking that
+         does not exist. */
+      if (err.constraint === "amenity_slot_once") return new AppError(409, "conflict", "That slot has just been booked by another resident");
       return new AppError(409, "conflict", "That record already exists");
     case "23514": // check_violation
       if (err.constraint === "bills_maker_is_not_checker") {

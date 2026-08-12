@@ -264,6 +264,56 @@ export async function seed({ silent = false } = {}) {
     }
     await c.query("SELECT setval('ticket_ref_seq', 2045)");
 
+    /* ---- amenities, the classes in them, and a diary with a clash to see ---- */
+    const amenityIds = {};
+    for (const [name, emoji, capacity, charge, deposit, slots, rules, approval] of [
+      ["Clubhouse Hall", "🏛️", 120, 2500, 5000, ["09:00–13:00", "14:00–18:00", "19:00–23:00"],
+        "No loud music after 10 PM. Deposit refunded after inspection.", true],
+      ["Swimming Pool", "🏊", 25, 0, 0, ["06:00–08:00", "08:00–10:00", "17:00–19:00", "19:00–21:00"],
+        "Swim cap mandatory. Children under 10 need an adult.", false],
+      ["Gymnasium", "🏋️", 15, 0, 0, ["05:30–07:30", "07:30–09:30", "18:00–20:00", "20:00–22:00"],
+        "Wipe equipment after use.", false],
+      ["Badminton Court", "🏸", 4, 150, 0, ["06:00–07:00", "07:00–08:00", "18:00–19:00", "19:00–20:00", "20:00–21:00"],
+        "Non-marking shoes only.", false],
+      ["Party Lawn", "🌿", 80, 4000, 8000, ["11:00–15:00", "18:00–23:00"],
+        "Catering vendors need a gate pass 24h in advance.", true],
+      ["Co-working Room", "💻", 8, 100, 0, ["09:00–13:00", "14:00–18:00"],
+        "Silence zone. Calls in the booth only.", false],
+    ]) {
+      const { rows: [row] } = await c.query(
+        `INSERT INTO amenities (society_id, name, emoji, capacity, charge, deposit, slots, rules, requires_approval)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING id`,
+        [society.id, name, emoji, capacity, charge, deposit, slots, rules, approval],
+      );
+      amenityIds[name] = row.id;
+    }
+
+    for (const [name, emoji, trainer, days, time, fee, seats, at] of [
+      ["Yoga — morning batch", "🧘", "Asha Menon", "Mon / Wed / Fri", "06:30 – 07:30", 800, 20, "Clubhouse Hall"],
+      ["Kids Karate", "🥋", "Sensei Rakesh", "Tue / Thu", "17:30 – 18:30", 1200, 24, "Clubhouse Hall"],
+      ["Zumba", "💃", "Nidhi Kapoor", "Sat / Sun", "08:00 – 09:00", 900, 25, "Clubhouse Hall"],
+      ["Swimming coaching", "🏊", "Coach Vinod", "Mon – Fri", "16:00 – 17:00", 1800, 12, "Swimming Pool"],
+    ]) {
+      await c.query(
+        `INSERT INTO amenity_classes (society_id, amenity_id, name, emoji, trainer, days, time, fee, seats)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+        [society.id, amenityIds[at], name, emoji, trainer, days, time, fee, seats],
+      );
+    }
+
+    const inDays = (n) => new Date(Date.now() + n * 864e5).toISOString().slice(0, 10);
+    for (const [who, flatCode, at, days, slot, guests, amount, status, note] of [
+      [rahul.id, "A-401", "Clubhouse Hall", 4, "19:00–23:00", 60, 2500, "confirmed", "Birthday party"],
+      [rahul.id, "A-401", "Badminton Court", 1, "19:00–20:00", 4, 150, "confirmed", ""],
+      [treasurer.id, "B-201", "Party Lawn", 6, "18:00–23:00", 75, 4000, "pending", "Anniversary"],
+    ]) {
+      await c.query(
+        `INSERT INTO amenity_bookings (society_id, amenity_id, user_id, flat_id, booking_date, slot, guests, note, amount, status)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
+        [society.id, amenityIds[at], who, flatByCode.get(flatCode).id, inDays(days), slot, guests, note, amount, status],
+      );
+    }
+
     /* ---- pending registrations for the approval queue ---- */
     for (const [name, code, relation, email] of [
       ["Priya Sharma", "B-302", "owner", "priya.new@email.com"],

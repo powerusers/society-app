@@ -138,6 +138,48 @@ export const postCommentSchema = z.object({
   text: z.string().trim().min(1, "Write something first").max(2000),
 });
 
+export const createAmenitySchema = z.object({
+  name: z.string().trim().min(2, "Name the amenity").max(80),
+  emoji: z.string().trim().min(1).max(8).optional().default("🏛️"),
+  capacity: z.coerce.number().int().min(1).max(5000).default(10),
+  charge: z.coerce.number().int().min(0).max(1_000_000).default(0),
+  deposit: z.coerce.number().int().min(0).max(1_000_000).default(0),
+  /* At least one, or nothing can be booked — an amenity with no slots is a
+     card residents can tap and get nowhere. */
+  slots: z.array(z.string().trim().min(1).max(40)).min(1, "Add at least one slot").max(24),
+  rules: z.string().trim().max(1000).optional().default(""),
+  requiresApproval: z.boolean().default(false),
+});
+
+export const updateAmenitySchema = createAmenitySchema.partial()
+  .extend({ active: z.boolean().optional() })
+  .refine((v) => Object.keys(v).length > 0, { message: "Nothing to change" });
+
+export const createBookingSchema = z.object({
+  amenityId: z.string().uuid("Choose an amenity"),
+  /* A date, not a datetime: a slot is a named part of a day. */
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Pick a date"),
+  slot: z.string().trim().min(1, "Pick a slot").max(40),
+  guests: z.coerce.number().int().min(1, "At least one").max(5000).default(1),
+  note: z.string().trim().max(500).optional().default(""),
+});
+
+export const decideBookingSchema = z.object({
+  decision: z.enum(["confirmed", "cancelled"]),
+  reason: z.string().trim().max(240).optional().default(""),
+});
+
+export const createClassSchema = z.object({
+  amenityId: z.string().uuid().nullish(),
+  name: z.string().trim().min(2, "Name the class").max(80),
+  emoji: z.string().trim().min(1).max(8).optional().default("🧘"),
+  trainer: z.string().trim().max(80).optional().default(""),
+  days: z.string().trim().max(60).optional().default(""),
+  time: z.string().trim().max(40).optional().default(""),
+  fee: z.coerce.number().int().min(0).max(1_000_000).default(0),
+  seats: z.coerce.number().int().min(1).max(1000).default(10),
+});
+
 export const importFlatsSchema = z.object({
   csv: z.string().min(1, "Paste or upload a CSV first").max(2_000_000),
   mode: z.enum(["preview", "apply"]).default("preview"),

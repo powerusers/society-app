@@ -171,11 +171,27 @@ export function useActions() {
     const book = (data) => {
       const clash = db.bookings.some((b) => b.amenityId === data.amenityId && b.date === data.date && b.slot === data.slot && b.status !== "cancelled");
       if (clash) { say("That slot is already booked.", "bad"); return null; }
-      const b = add("bookings", { ...data, userId: me.id, flatCode: me.flat, status: data.amount > 2000 ? "pending" : "confirmed" });
+      /* Whether it needs approving is the amenity's property here too, so the
+         demo behaves like the live board rather than guessing from the amount. */
+      const a = sel.amenity(data.amenityId);
+      const b = add("bookings", {
+        ...data, userId: me.id, flatCode: me.flat, amount: a?.charge ?? data.amount ?? 0,
+        status: a?.requiresApproval ? "pending" : "confirmed",
+      });
       say(b.status === "pending" ? "Requested — committee approval needed for this amenity." : "Booked ✓");
       logAudit("amenity.book", sel.amenity(data.amenityId)?.name, `${data.date} ${data.slot}`);
       return b;
     };
+
+    const decideBooking = (id, status) => patch("bookings", id, { status, decidedAt: iso(), decidedBy: me.id });
+
+    const addAmenity = (data) => add("amenities", { ...data, active: true });
+
+    const addClass = (data) => add("classes", { ...data, enrolled: 0 });
+
+    /* Demo enrolment stays a counter because the seeded classes arrive with
+       one; the live board counts people. */
+    const enrol = (id) => patch("classes", id, (c) => ({ enrolled: c.enrolled + 1 }));
 
     /* ---------------- billing / accounts ---------------- */
     /* Preview only. When the API is wired in, the amount a resident is charged is
@@ -290,6 +306,7 @@ export function useActions() {
       raiseTicket, commentTicket, setTicketStatus, slaFor,
       postNotice, react, markRead, vote, createPoll, book,
       createPost, likePost, replyToPost, removePost,
+      decideBooking, addAmenity, addClass, enrol,
       computeBill, generateBills, approveRun, rejectRun, payBill, addLedger, reconcile,
       approveRegistration, rejectRegistration,
       cycles: { current: thisCycle(), next: shiftCycle(thisCycle(), 1) },

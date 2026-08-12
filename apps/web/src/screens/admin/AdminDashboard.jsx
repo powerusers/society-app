@@ -3,10 +3,12 @@ import Icons from "../../icons";
 import { Badge, Btn, Stat, Alert, Empty } from "../../components/ui";
 import { QuickAction } from "../../components/entities";
 import { useApp } from "../../store";
+import { useAmenities } from "../../data/amenities";
 import { inr, lakh, pct, cycleLabel, thisCycle, ago, until, fmtDate, minsBetween } from "../../lib/format";
 
 export default function AdminDashboard({ nav }) {
   const { db, me, can, sel } = useApp();
+  const { bookings, pending: pendingBookings } = useAmenities();
   const cycle = thisCycle();
 
   const billed = sel.billed(cycle);
@@ -17,7 +19,6 @@ export default function AdminDashboard({ nav }) {
   const liveTickets = db.tickets.filter((t) => t.status === "open" || t.status === "in-progress");
   const breached = liveTickets.filter((t) => until(t.slaDueAt).late);
   const openIncidents = db.incidents.filter((i) => i.status === "open");
-  const pendingBookings = db.bookings.filter((b) => b.status === "pending");
   const insideNow = db.visitors.filter((v) => v.status === "inside");
   const unreconciled = db.payments.filter((p) => !p.reconciled);
 
@@ -101,7 +102,7 @@ export default function AdminDashboard({ nav }) {
         <div className="hairline" />
         <div className="row"><span className="muted">Visitors logged</span><b>{db.visitors.length}</b></div>
         <div className="hairline" />
-        <div className="row"><span className="muted">Amenity bookings</span><b>{db.bookings.length}</b></div>
+        <div className="row"><span className="muted">Amenity bookings</span><b>{bookings.length}</b></div>
       </div>
 
       <div className="sect">
