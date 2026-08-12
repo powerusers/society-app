@@ -4,6 +4,8 @@ import { Badge, Btn, Empty, Sheet, Segmented, SearchBar, Chips, Stat, Avatar, Te
 import { useApp } from "../../store";
 import { useFlats, useFlat } from "../../data/flats";
 import { useRegistrations } from "../../data/registrations";
+import { useMembers } from "../../data/users";
+import { MemberRoleSheet, RoleBadge } from "../../components/MemberRole";
 import { fmtDate, ago, inr, csv, download } from "../../lib/format";
 
 /* The register stores owner-occupied / tenant-occupied / vacant; the demo seed
@@ -24,11 +26,23 @@ export default function Residents() {
   const { registrations: pending, loading: regsLoading, error: regsError, approve, reject, refetch: refetchRegs } =
     useRegistrations("pending");
 
+  const { members, loading: membersLoading, error: membersError, refetch: refetchMembers, refusalFor, setRole } =
+    useMembers();
+
   const [tab, setTab] = useState("approvals");
   const [q, setQ] = useState("");
   const [block, setBlock] = useState("all");
+  const [memberQ, setMemberQ] = useState("");
   const [rejecting, setRejecting] = useState(null);
   const [open, setOpen] = useState(null);
+  const [editing, setEditing] = useState(null);
+
+  const shownMembers = useMemo(() => {
+    const t = memberQ.trim().toLowerCase();
+    if (!t) return members;
+    return members.filter((m) =>
+      m.name.toLowerCase().includes(t) || (m.flat || "").toLowerCase().includes(t) || (m.email || "").toLowerCase().includes(t));
+  }, [members, memberQ]);
 
   const duesOf = (f) => (live ? (f.dues ?? 0) : sel.duesOf(f.code));
   const occupied = flats.filter((f) => f.occupancy && f.occupancy !== "vacant").length;
@@ -59,7 +73,8 @@ export default function Residents() {
       <div style={{ marginTop: 12 }}>
         <Segmented value={tab} onChange={setTab} options={[
           { value: "approvals", label: `Approvals (${pending.length})` },
-          { value: "register", label: `Flat register (${flats.length})` },
+          ...(can("staff.manage") ? [{ value: "members", label: `Members (${members.length})` }] : []),
+          { value: "register", label: `Flats (${flats.length})` },
         ]} />
       </div>
 
@@ -108,6 +123,41 @@ export default function Residents() {
                   )}
                 </div>
               ))}
+            </>
+          )}
+        </>
+      )}
+
+      {tab === "members" && can("staff.manage") && (
+        <>
+          {membersError && (
+            <Alert kind="err" icon={Icons.AlertTri}>
+              {membersError.message}{" "}
+              <button className="linkbtn" style={{ color: "inherit", textDecoration: "underline" }} onClick={refetchMembers}>Retry</button>
+            </Alert>
+          )}
+          {membersLoading ? <SkeletonList rows={5} /> : (
+            <>
+              <Alert kind="info" icon={Icons.Lock}>
+                A role decides what someone can do. Only an administrator can grant or remove
+                committee access, and nobody can change their own role.
+              </Alert>
+              <SearchBar value={memberQ} onChange={setMemberQ} placeholder="Search name, flat or email…" />
+              <div className="list">
+                {shownMembers.map((m) => (
+                  <div key={m.id} className="li tap" onClick={() => setEditing(m)}>
+                    <Avatar name={m.name} />
+                    <div className="grow">
+                      <p className="h4">{m.name}</p>
+                      <p className="tiny" style={{ marginTop: 3 }}>
+                        {[m.designation, m.flat && `Flat ${m.flat}`, m.email].filter(Boolean).join(" · ")}
+                      </p>
+                    </div>
+                    <RoleBadge role={m.role} />
+                  </div>
+                ))}
+                {!shownMembers.length && <Empty icon={Icons.Users} title="Nobody matches that search" />}
+              </div>
             </>
           )}
         </>
@@ -171,6 +221,11 @@ export default function Residents() {
         </Sheet>
       )}
       {open && <FlatSheet f={open} dues={duesOf(open)} onClose={() => setOpen(null)} />}
+      {editing && (
+        <MemberRoleSheet member={editing} refusalFor={refusalFor}
+          onSave={(role, designation) => setRole(editing, role, designation)}
+          onClose={() => setEditing(null)} />
+      )}
     </>
   );
 }

@@ -8,6 +8,7 @@ import { authRouter } from "./routes/auth.js";
 import { setupRouter } from "./routes/setup.js";
 import { meRouter } from "./routes/me.js";
 import { flatsRouter, registrationsRouter } from "./routes/flats.js";
+import { usersRouter } from "./routes/users.js";
 import { visitorsRouter } from "./routes/visitors.js";
 import { billsRouter } from "./routes/bills.js";
 import { ticketsRouter } from "./routes/tickets.js";
@@ -61,6 +62,7 @@ export function createApp() {
   app.use("/api/auth", authRouter);
   app.use("/api/me", meRouter);
   app.use("/api/flats", flatsRouter);
+  app.use("/api/users", usersRouter);
   app.use("/api/registrations", registrationsRouter);
   app.use("/api/visitors", visitorsRouter);
   app.use("/api/bills", billsRouter);
