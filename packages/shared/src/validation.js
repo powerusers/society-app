@@ -7,6 +7,7 @@ import {
 import {
   DOCUMENT_CATEGORIES, DOCUMENT_VISIBILITY, MAX_DOCUMENT_BYTES, isAllowedContentType,
 } from "./documents.js";
+import { ROLES } from "./capabilities.js";
 
 /** Request payload schemas. The API validates with these; forms reuse them for client-side checks. */
 
@@ -75,6 +76,13 @@ export const createInviteSchema = z.object({
   societyName: z.string().trim().min(2).max(160).nullish(),
   email: z.string().email().nullish(),
   days: z.coerce.number().int().min(1).max(90).optional().default(14),
+});
+
+export const setRoleSchema = z.object({
+  role: z.enum(ROLES),
+  /* A label on the person, not a permission — "Treasurer" grants nothing. Sent
+     alongside the role because the two are always decided together. */
+  designation: z.string().trim().max(60).nullish(),
 });
 
 export const importFlatsSchema = z.object({

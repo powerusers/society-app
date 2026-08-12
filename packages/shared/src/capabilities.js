@@ -53,6 +53,49 @@ export function canApproveRun(user, run) {
   return { ok: true };
 }
 
+/** Roles that carry power over the society rather than over one flat. */
+export const PRIVILEGED_ROLES = ["admin", "committee"];
+const privileged = (role) => PRIVILEGED_ROLES.includes(role);
+
+/**
+ * Who may change whose role.
+ *
+ * Granting a role is granting every capability behind it, so this is deliberately
+ * narrower than the capability that opens the screen:
+ *
+ *  - Nobody changes their own role. It is how an administrator locks themselves
+ *    out, and how anyone with the screen open promotes themselves.
+ *  - Committee can move people between resident, staff and guard — the
+ *    operational roles.
+ *  - Only an administrator can grant or remove committee and admin. Otherwise a
+ *    committee member could appoint allies, or demote the peers who would
+ *    review their billing runs, which is the separation of duties undone from
+ *    the side.
+ *
+ * The last-administrator rule needs the whole society, so it lives in the API;
+ * everything decidable from two users is decided here, once.
+ */
+export function canAssignRole(actor, target, nextRole) {
+  if (!actor || !target) return { ok: false, reason: "unknown_user" };
+  if (!ROLES.includes(nextRole)) return { ok: false, reason: "unknown_role" };
+  if (actor.id === target.id) return { ok: false, reason: "self" };
+  if (!can(actor.role, "staff.manage")) return { ok: false, reason: "no_capability" };
+  if ((privileged(nextRole) || privileged(target.role)) && !can(actor.role, "settings.write")) {
+    return { ok: false, reason: "needs_admin" };
+  }
+  return { ok: true };
+}
+
+/** Why a role change was refused, in words a committee member can act on. */
+export const ROLE_REFUSAL = {
+  self: "You cannot change your own role — ask another administrator.",
+  no_capability: "Your role cannot manage members.",
+  needs_admin: "Only an administrator can grant or remove committee access.",
+  unknown_role: "That is not a role on this platform.",
+  unknown_user: "That account is not in this society.",
+  last_admin: "This is the society's only administrator — appoint another one first.",
+};
+
 /** Scope check for reading and raising: staff roles act society-wide, residents only on their own flat. */
 export function canActOnFlat(user, flatCode) {
   if (can(user.role, "gate.view")) return true;
