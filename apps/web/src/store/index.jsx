@@ -1,21 +1,31 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { can as canDo } from "@gvs/shared";
-import { buildSeed } from "./seed";
+import { buildSeed, emptyStore } from "./seed";
 import { uid, iso } from "../lib/format";
 import { api, isLive, onAuthChange, clearTokens } from "../lib/api";
 
-const DB_KEY = "gvs.db.v4";
+/* Separate keys per mode. A browser that has run the demo must not hand its
+   seeded Green Valley store to a live deployment on the next visit — which is
+   exactly what one shared key would do. */
+const DB_KEY = (live) => (live ? "gvs.db.live.v1" : "gvs.db.v4");
 const SESSION_KEY = "gvs.session.v4";
 
-const load = () => {
+/**
+ * Demo mode starts from the seeded society. Live mode starts empty: the screens
+ * still reading this store have no endpoint yet, and showing a real society
+ * another society's notices, ledger and resident list is worse than showing it
+ * nothing.
+ */
+const load = (live) => {
+  const fresh = () => (live ? emptyStore() : buildSeed());
   try {
-    const raw = localStorage.getItem(DB_KEY);
+    const raw = localStorage.getItem(DB_KEY(live));
     if (raw) {
       const parsed = JSON.parse(raw);
       if (parsed && parsed.version === 4) return parsed;
     }
-  } catch { /* corrupt storage — fall through to a fresh seed */ }
-  return buildSeed();
+  } catch { /* corrupt storage — fall through */ }
+  return fresh();
 };
 
 const Ctx = createContext(null);
@@ -31,7 +41,7 @@ export const useApp = () => useContext(Ctx);
 export function AppProvider({ children }) {
   const live = isLive();
 
-  const [db, setDb] = useState(load);
+  const [db, setDb] = useState(() => load(live));
   const [toast, setToast] = useState(null);
 
   /* --- demo-mode session: a user id into the local store --- */
@@ -45,7 +55,7 @@ export function AppProvider({ children }) {
     status: live ? "resuming" : "demo", user: null, flat: null, society: null, capabilities: [],
   });
 
-  useEffect(() => { localStorage.setItem(DB_KEY, JSON.stringify(db)); }, [db]);
+  useEffect(() => { localStorage.setItem(DB_KEY(live), JSON.stringify(db)); }, [db, live]);
 
   useEffect(() => {
     if (live) return;
@@ -138,7 +148,9 @@ export function AppProvider({ children }) {
   }, [live]);
 
   const resetDemo = useCallback(() => {
-    setDb(buildSeed());
+    /* Re-seeding a live deployment would put another society's data back in
+       front of a real one, which is the thing this mode exists to avoid. */
+    setDb(live ? emptyStore() : buildSeed());
     if (live) { clearTokens(); setServer({ status: "anon", user: null, flat: null, society: null, capabilities: [] }); }
     else setLocalSession(null);
   }, [live]);
