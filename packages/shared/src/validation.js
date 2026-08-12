@@ -2,7 +2,7 @@ import { z } from "zod";
 import {
   VISITOR_CATEGORIES, VISITOR_STATUSES, TICKET_CATEGORIES, TICKET_PRIORITIES,
   TICKET_STATUSES, TICKET_SOURCES, PAYMENT_MODES, RELATIONS,
-  INCIDENT_TYPES, SEVERITIES, NOTICE_KINDS,
+  INCIDENT_TYPES, SEVERITIES, NOTICE_KINDS, POST_TYPES,
 } from "./entities.js";
 import {
   DOCUMENT_CATEGORIES, DOCUMENT_VISIBILITY, MAX_DOCUMENT_BYTES, isAllowedContentType,
@@ -118,6 +118,24 @@ export const createPollSchema = z.object({
 
 export const votePollSchema = z.object({
   optionId: z.string().uuid("Choose one of the options"),
+});
+
+/* The residents' board. Anyone in the society may post here — unlike a notice,
+   which carries the committee's voice. */
+export const createPostSchema = z.object({
+  type: z.enum(POST_TYPES).default("discussion"),
+  title: z.string().trim().min(3, "Give your post a title").max(160),
+  body: z.string().trim().max(2000).optional().default(""),
+  /* Only a classified has one, and free is a price. The API rejects a price on
+     anything else rather than quietly dropping it, so a mis-typed listing is
+     reported instead of published without its price. */
+  price: z.coerce.number().int().min(0).max(10_000_000).nullish(),
+}).refine((v) => v.price == null || v.type === "classified", {
+  message: "Only a listing for sale carries a price", path: ["price"],
+});
+
+export const postCommentSchema = z.object({
+  text: z.string().trim().min(1, "Write something first").max(2000),
 });
 
 export const importFlatsSchema = z.object({

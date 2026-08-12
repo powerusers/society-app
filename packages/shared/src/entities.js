@@ -48,6 +48,10 @@ export const RELATIONS = ["owner", "co-owner", "tenant"];
 
 export const NOTICE_KINDS = ["notice", "event", "payment", "alert"];
 
+/* The residents' own board, as opposed to the committee's. A classified carries
+   a price; the other two do not. */
+export const POST_TYPES = ["discussion", "recommendation", "classified"];
+
 export const INCIDENT_TYPES = ["misbehaviour", "trespass", "safety", "vehicle", "overstay", "other"];
 export const SEVERITIES = ["high", "medium", "low"];
 

@@ -7,7 +7,7 @@ import { code6, iso, uid, thisCycle, shiftCycle } from "../lib/format";
 
 /** Domain operations shared by more than one screen. */
 export function useActions() {
-  const { db, me, add, patch, setColl, setDb, say, logAudit, sel } = useApp();
+  const { db, me, add, patch, remove, setColl, setDb, say, logAudit, sel } = useApp();
 
   return useMemo(() => {
     /* ---------------- gate ---------------- */
@@ -150,6 +150,24 @@ export function useActions() {
       return p;
     };
 
+    /* The residents' board in demo mode. `likes` stays a counter here because
+       the seeded posts arrive with one; the live board counts people. */
+    const createPost = ({ type, title, body, price }) => {
+      const p = add("forum", {
+        type, title, body: body || "", by: me.id, at: iso(), likes: 0, comments: [],
+        ...(type === "classified" ? { price: Number(price || 0) } : {}),
+      });
+      say("Posted to the community ✓");
+      return p;
+    };
+
+    const likePost = (id) => patch("forum", id, (p) => ({ likes: p.likes + 1 }));
+
+    const replyToPost = (id, text) =>
+      patch("forum", id, (p) => ({ comments: [...p.comments, { id: uid("fc"), by: me.id, at: iso(), text }] }));
+
+    const removePost = (id) => { remove("forum", id); say("Post removed"); };
+
     const book = (data) => {
       const clash = db.bookings.some((b) => b.amenityId === data.amenityId && b.date === data.date && b.slot === data.slot && b.status !== "cancelled");
       if (clash) { say("That slot is already booked.", "bad"); return null; }
@@ -271,9 +289,10 @@ export function useActions() {
       raiseIncident, logPatrol, markHelp,
       raiseTicket, commentTicket, setTicketStatus, slaFor,
       postNotice, react, markRead, vote, createPoll, book,
+      createPost, likePost, replyToPost, removePost,
       computeBill, generateBills, approveRun, rejectRun, payBill, addLedger, reconcile,
       approveRegistration, rejectRegistration,
       cycles: { current: thisCycle(), next: shiftCycle(thisCycle(), 1) },
     };
-  }, [db, me, add, patch, setColl, setDb, say, logAudit, sel]);
+  }, [db, me, add, patch, remove, setColl, setDb, say, logAudit, sel]);
 }
