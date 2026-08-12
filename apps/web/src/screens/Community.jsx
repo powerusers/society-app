@@ -1,9 +1,10 @@
 import { useMemo, useState } from "react";
 import Icons from "../icons";
-import { Badge, Btn, Sheet, Empty, Segmented, Bar, Avatar, TextArea, Input, Select } from "../components/ui";
+import { Badge, Btn, Sheet, Empty, Segmented, Bar, Avatar, TextArea, Input, Select, Alert, SkeletonList } from "../components/ui";
 import { NoticeCard } from "../components/entities";
 import { PostNoticeSheet } from "../components/sheets";
 import { useApp } from "../store";
+import { useNotices } from "../data/notices";
 import { useActions } from "../store/actions";
 import { ago, fmtDate, inr, pct, uid, iso } from "../lib/format";
 
@@ -17,11 +18,17 @@ const TABS = [
 export default function Community({ nav }) {
   const { db, me, can, sel, add, say, patch } = useApp();
   const A = useActions();
+  const {
+    notices, unread, loading: noticesLoading, error: noticesError, refetch: refetchNotices,
+    create: postNotice, markRead, react, comment,
+  } = useNotices();
   const [tab, setTab] = useState("notices");
   const [sheet, setSheet] = useState(null);
   const [open, setOpen] = useState(null);
 
-  const unread = db.notices.filter((n) => !(n.readBy || []).includes(me.id)).length;
+  /* The sheet renders from the board rather than the row that opened it, so a
+     comment or a reaction shows up without closing and reopening. */
+  const openNotice = open ? notices.find((n) => n.id === open.id) || open : null;
 
   return (
     <>
@@ -30,13 +37,28 @@ export default function Community({ nav }) {
       {tab === "notices" && (
         <>
           <div className="row" style={{ marginBottom: 12 }}>
-            <p className="muted">{db.notices.length} notices · {unread} unread</p>
+            <p className="muted">{notices.length} notices · {unread} unread</p>
             {can("notice.write") && <Btn size="sm" icon={Icons.Plus} onClick={() => setSheet("post")}>Post</Btn>}
           </div>
-          {[...db.notices].sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0)).map((n) => (
-            <NoticeCard key={n.id} n={n} onOpen={() => { A.markRead(n.id); setOpen(n); }} />
-          ))}
-          {!db.notices.length && <Empty icon={Icons.Board} title="Notice board is empty" />}
+          {noticesError && (
+            <Alert kind="err" icon={Icons.AlertTri}>
+              {noticesError.message}{" "}
+              <button className="linkbtn" style={{ color: "inherit", textDecoration: "underline" }} onClick={refetchNotices}>Retry</button>
+            </Alert>
+          )}
+          {noticesLoading ? <SkeletonList rows={3} /> : (
+            <>
+              {/* The server already returns pinned first; sorting again here
+                  keeps the demo board in the same order. */}
+              {[...notices].sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0)).map((n) => (
+                <NoticeCard key={n.id} n={n} onOpen={() => { markRead(n); setOpen(n); }} />
+              ))}
+              {!notices.length && (
+                <Empty icon={Icons.Board} title="Notice board is empty"
+                  note={can("notice.write") ? "Post the first one — every resident will see it." : "Notices from the committee appear here."} />
+              )}
+            </>
+          )}
         </>
       )}
 
@@ -54,9 +76,11 @@ export default function Community({ nav }) {
       {tab === "forum" && <Forum kinds={["discussion", "recommendation"]} onNew={() => setSheet("post-forum")} />}
       {tab === "market" && <Forum kinds={["classified"]} onNew={() => setSheet("post-forum")} market />}
 
-      {sheet === "post" && <PostNoticeSheet onClose={() => setSheet(null)} />}
+      {sheet === "post" && <PostNoticeSheet onPost={postNotice} onClose={() => setSheet(null)} />}
       {sheet === "post-forum" && <NewPostSheet onClose={() => setSheet(null)} />}
-      {open && <NoticeSheet n={open} onClose={() => setOpen(null)} />}
+      {openNotice && (
+        <NoticeSheet n={openNotice} onReact={react} onComment={comment} onClose={() => setOpen(null)} />
+      )}
     </>
   );
 }
@@ -93,42 +117,55 @@ function PollCard({ p, onVote, me }) {
   );
 }
 
-function NoticeSheet({ n, onClose }) {
-  const { sel, me, patch, say } = useApp();
-  const A = useActions();
+function NoticeSheet({ n, onReact, onComment, onClose }) {
   const [text, setText] = useState("");
+  const [sending, setSending] = useState(false);
+
+  const send = async () => {
+    if (!text.trim() || sending) return;
+    setSending(true);
+    const res = await onComment(n, text.trim());
+    setSending(false);
+    if (res?.ok !== false) setText("");
+  };
+
   return (
     <Sheet title={n.title} onClose={onClose}>
       <div className="wrap" style={{ marginBottom: 10 }}>
         <Badge color={n.priority === "high" ? "red" : "blue"}>{n.kind}</Badge>
-        <Badge>{sel.userName(n.author)}</Badge>
+        <Badge>{n.author}</Badge>
         <Badge>{fmtDate(n.at)}</Badge>
-        <Badge color="green">Read by {(n.readBy || []).length}</Badge>
+        <Badge color="green">Read by {n.readCount ?? 0}</Badge>
       </div>
       <p className="muted" style={{ fontSize: 14, lineHeight: 1.6, marginBottom: 14 }}>{n.body}</p>
       <div className="wrap" style={{ marginBottom: 16 }}>
-        {["👍", "❤️", "🎉", "😟"].map((e) => (
-          <button key={e} className="chip" onClick={() => A.react(n.id, e)}>{e} {n.reactions?.[e] || ""}</button>
-        ))}
+        {/* `mine` comes from the server, so the chip shows what this person
+            reacted rather than what this browser remembers. */}
+        {["👍", "❤️", "🎉", "😟"].map((e) => {
+          const mine = (n.myReactions || []).includes(e);
+          return (
+            <button key={e} className={`chip${mine ? " on" : ""}`} onClick={() => onReact(n, e)}>
+              {e} {n.reactions?.[e] || ""}
+            </button>
+          );
+        })}
       </div>
       <p className="h4" style={{ marginBottom: 8 }}>Comments ({n.comments?.length || 0})</p>
       {(n.comments || []).map((c) => (
         <div key={c.id} className="li" style={{ padding: "9px 0" }}>
-          <Avatar name={sel.userName(c.by)} />
+          <Avatar name={c.author} />
           <div className="grow">
-            <p className="h4">{sel.userName(c.by)} <span className="tiny">· {ago(c.at)}</span></p>
-            <p className="muted">{c.text}</p>
+            <p className="h4">{c.author} <span className="tiny">· {ago(c.at)}</span></p>
+            <p className="muted">{c.body}</p>
           </div>
         </div>
       ))}
+      {!n.comments?.length && <p className="hint">No comments yet.</p>}
       <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
-        <input className="inp" placeholder="Write a comment…" value={text} onChange={(e) => setText(e.target.value)} />
-        <Btn icon={Icons.Send} onClick={() => {
-          if (!text.trim()) return;
-          patch("notices", n.id, (x) => ({ comments: [...(x.comments || []), { id: uid("c"), by: me.id, at: iso(), text: text.trim() }] }));
-          setText("");
-          say("Comment posted");
-        }} />
+        <input className="inp" placeholder="Write a comment…" value={text}
+          onChange={(e) => setText(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && send()} />
+        <Btn icon={Icons.Send} disabled={sending || !text.trim()} onClick={send} />
       </div>
     </Sheet>
   );

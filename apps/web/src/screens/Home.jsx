@@ -7,6 +7,7 @@ import { useApp } from "../store";
 import { useActions } from "../store/actions";
 import { useVisitors } from "../data/visitors";
 import { useMyBills } from "../data/bills";
+import { useNotices } from "../data/notices";
 import { inr, lakh, cycleLabel, fmtDate, pct, thisCycle, fmtTime } from "../lib/format";
 
 export default function Home({ nav }) {
@@ -14,6 +15,7 @@ export default function Home({ nav }) {
   const A = useActions();
   const { visitors, transition } = useVisitors();
   const { bills, dues } = useMyBills();
+  const { notices } = useNotices();
   const [sheet, setSheet] = useState(null);
 
   const flat = me.flat;
@@ -203,10 +205,13 @@ export default function Home({ nav }) {
         <h2 className="h2">Notice board</h2>
         <button className="linkbtn" onClick={() => nav.switchTab("community")}>View all →</button>
       </div>
-      {db.notices.slice(0, 2).map((n) => (
+      {notices.slice(0, 2).map((n) => (
         <NoticeCard key={n.id} n={n} onOpen={() => nav.switchTab("community")} />
       ))}
-      {db.notices.length === 0 && <Empty icon={Icons.Board} title="No notices yet" />}
+      {notices.length === 0 && (
+        <Empty icon={Icons.Board} title="No notices yet"
+          note={can("notice.write") ? "Post one from Community — every resident sees it." : "Notices from the committee appear here."} />
+      )}
 
       {sheet === "pre" && <PreApproveSheet onClose={() => setSheet(null)} />}
       {sheet === "ticket" && <RaiseTicketSheet onClose={() => setSheet(null)} />}

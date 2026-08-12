@@ -2,7 +2,7 @@ import { z } from "zod";
 import {
   VISITOR_CATEGORIES, VISITOR_STATUSES, TICKET_CATEGORIES, TICKET_PRIORITIES,
   TICKET_STATUSES, TICKET_SOURCES, PAYMENT_MODES, RELATIONS,
-  INCIDENT_TYPES, SEVERITIES,
+  INCIDENT_TYPES, SEVERITIES, NOTICE_KINDS,
 } from "./entities.js";
 import {
   DOCUMENT_CATEGORIES, DOCUMENT_VISIBILITY, MAX_DOCUMENT_BYTES, isAllowedContentType,
@@ -83,6 +83,29 @@ export const setRoleSchema = z.object({
   /* A label on the person, not a permission — "Treasurer" grants nothing. Sent
      alongside the role because the two are always decided together. */
   designation: z.string().trim().max(60).nullish(),
+});
+
+export const createNoticeSchema = z.object({
+  kind: z.enum(NOTICE_KINDS).default("notice"),
+  title: z.string().trim().min(3, "Give the notice a title").max(160),
+  body: z.string().trim().min(1, "A notice needs something in it").max(4000),
+  priority: z.enum(["normal", "high"]).default("normal"),
+  pinned: z.boolean().default(false),
+});
+
+/** Editing a posted notice: every field optional, but at least one required. */
+export const updateNoticeSchema = createNoticeSchema.partial().refine(
+  (v) => Object.keys(v).length > 0,
+  { message: "Nothing to change" },
+);
+
+export const noticeCommentSchema = z.object({
+  body: z.string().trim().min(1, "Write something first").max(1000),
+});
+
+export const noticeReactionSchema = z.object({
+  /* Short enough to be an emoji and not a paragraph pasted into the chip row. */
+  emoji: z.string().trim().min(1).max(8),
 });
 
 export const importFlatsSchema = z.object({

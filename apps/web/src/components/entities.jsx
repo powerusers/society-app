@@ -90,7 +90,6 @@ const NOTICE_KIND = {
 };
 
 export function NoticeCard({ n, onOpen }) {
-  const { sel } = useApp();
   const k = NOTICE_KIND[n.kind] || NOTICE_KIND.notice;
   return (
     <div className="card tap" onClick={onOpen} role="button">
@@ -105,7 +104,10 @@ export function NoticeCard({ n, onOpen }) {
       <p className="h3" style={{ marginBottom: 5 }}>{n.title}</p>
       <p className="muted clamp3">{n.body}</p>
       <div className="row" style={{ marginTop: 11 }}>
-        <span className="tiny">{sel.userName(n.author)}</span>
+        {/* Already a name: the repository resolves it in demo mode, and the API
+            sends it in live mode, since only the server can look up a user the
+            browser was never given. */}
+        <span className="tiny">{n.author}</span>
         <div className="wrap">
           {Object.entries(n.reactions || {}).map(([e, c]) => (
             <span key={e} className="badge bare">{e} {c}</span>

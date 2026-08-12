@@ -134,15 +134,15 @@ export function RaiseTicketSheet({ onClose, defaultCategory }) {
   );
 }
 
-export function PostNoticeSheet({ onClose }) {
+export function PostNoticeSheet({ onPost, onClose }) {
   const A = useActions();
   const [tab, setTab] = useState("notice");
   const [f, setF] = useState({ title: "", body: "", kind: "notice", priority: "normal", pinned: false });
   const [poll, setPoll] = useState({ question: "", options: ["", ""], days: 7 });
   const u = (k, v) => setF((p) => ({ ...p, [k]: v }));
   const [err, setErr] = useState("");
-  const { add, say } = useApp();
-  const { me } = useApp();
+  const [busy, setBusy] = useState(false);
+  const { add, say, me } = useApp();
 
   return (
     <Sheet title={tab === "notice" ? "Post a notice" : "Create a poll"} onClose={onClose}>
@@ -162,11 +162,17 @@ export function PostNoticeSheet({ onClose }) {
             </div>
           </div>
           {err && <p className="err" style={{ marginBottom: 10 }}>{err}</p>}
-          <Btn block icon={Icons.Send} onClick={() => {
+          <Btn block icon={Icons.Send} disabled={busy} onClick={async () => {
             if (!f.title.trim() || !f.body.trim()) return setErr("Title and details are both needed");
-            A.postNotice(f);
+            setBusy(true);
+            /* Published through the caller, so the board that shows it is the
+               one that refreshes — and a server refusal is reported here
+               rather than closing over a notice that was never posted. */
+            const res = await onPost(f);
+            setBusy(false);
+            if (res?.ok === false) return setErr(res.error?.message || "Could not post the notice");
             onClose();
-          }}>Publish to all residents</Btn>
+          }}>{busy ? "Publishing…" : "Publish to all residents"}</Btn>
         </>
       ) : (
         <>
