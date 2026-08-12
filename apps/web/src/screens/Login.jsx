@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import Icons from "../icons";
 import { Btn, Input, Select, Alert, SearchBar, SkeletonList } from "../components/ui";
+import { Mark } from "../components/Mark";
 import { useApp } from "../store";
 import Setup from "./Setup";
 import { APP_NAME, APP_TAGLINE } from "../lib/brand";
@@ -47,7 +48,7 @@ export default function Login() {
     <div className="app" style={{ background: "linear-gradient(165deg,var(--b700) 0%,var(--b800) 55%,var(--b900) 100%)", padding: "48px 20px 36px" }}>
       <div style={{ textAlign: "center", marginBottom: 28 }}>
         <div style={{ width: 62, height: 62, background: "rgba(255,255,255,.1)", border: "1px solid rgba(255,255,255,.14)", borderRadius: "var(--r-lg)", display: "inline-flex", alignItems: "center", justifyContent: "center", marginBottom: 16 }}>
-          <Icons.Building size={28} style={{ color: "#fff" }} />
+          <Mark size={30} style={{ color: "#fff" }} />
         </div>
         {/* The platform's name, not a society's. Nobody has a society yet at
             this point, and the demo seed's one is not an answer. */}
