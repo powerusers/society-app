@@ -135,6 +135,21 @@ export function useActions() {
       say("Vote recorded ✓");
     };
 
+    /* The demo poll is shaped like the seeded ones — a voters map and per-option
+       counts — so the same normalisation in the repository can hide the tallies
+       here too, and the demo behaves like the real thing. */
+    const createPoll = ({ question, options, days = 7 }) => {
+      const p = add("polls", {
+        question, createdBy: me.id, at: iso(),
+        closesAt: new Date(Date.now() + Number(days) * 864e5).toISOString(),
+        options: options.map((text, i) => ({ id: `o${i}`, text, votes: 0 })),
+        voters: {},
+      });
+      say("Poll published ✓");
+      logAudit("poll.create", question, `${options.length} options`);
+      return p;
+    };
+
     const book = (data) => {
       const clash = db.bookings.some((b) => b.amenityId === data.amenityId && b.date === data.date && b.slot === data.slot && b.status !== "cancelled");
       if (clash) { say("That slot is already booked.", "bad"); return null; }
@@ -255,7 +270,7 @@ export function useActions() {
       sendToFlat, approveVisitor, denyVisitor, admitVisitor, exitVisitor, preApprove, selfCheckin,
       raiseIncident, logPatrol, markHelp,
       raiseTicket, commentTicket, setTicketStatus, slaFor,
-      postNotice, react, markRead, vote, book,
+      postNotice, react, markRead, vote, createPoll, book,
       computeBill, generateBills, approveRun, rejectRun, payBill, addLedger, reconcile,
       approveRegistration, rejectRegistration,
       cycles: { current: thisCycle(), next: shiftCycle(thisCycle(), 1) },

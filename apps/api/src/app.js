@@ -13,6 +13,7 @@ import { visitorsRouter } from "./routes/visitors.js";
 import { billsRouter } from "./routes/bills.js";
 import { ticketsRouter } from "./routes/tickets.js";
 import { noticesRouter } from "./routes/notices.js";
+import { pollsRouter } from "./routes/polls.js";
 import { documentsRouter } from "./routes/documents.js";
 import { errorHandler, notFoundHandler } from "./middleware/errorHandler.js";
 import { pool } from "./db/pool.js";
@@ -69,6 +70,7 @@ export function createApp() {
   app.use("/api/bills", billsRouter);
   app.use("/api/tickets", ticketsRouter);
   app.use("/api/notices", noticesRouter);
+  app.use("/api/polls", pollsRouter);
   app.use("/api/documents", documentsRouter);
 
   app.use(notFoundHandler);

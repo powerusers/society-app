@@ -3,7 +3,6 @@ import Icons from "../icons";
 import { Sheet, Btn, Input, Select, TextArea, Alert, Badge, Segmented } from "./ui";
 import QR from "../lib/qr";
 import { useApp } from "../store";
-import { useActions } from "../store/actions";
 import { useVisitors } from "../data/visitors";
 import { useTickets } from "../data/tickets";
 import { useGates } from "../data/gates";
@@ -134,15 +133,13 @@ export function RaiseTicketSheet({ onClose, defaultCategory }) {
   );
 }
 
-export function PostNoticeSheet({ onPost, onClose }) {
-  const A = useActions();
-  const [tab, setTab] = useState("notice");
+export function PostNoticeSheet({ onPost, onPoll, tab: initialTab = "notice", onClose }) {
+  const [tab, setTab] = useState(initialTab);
   const [f, setF] = useState({ title: "", body: "", kind: "notice", priority: "normal", pinned: false });
   const [poll, setPoll] = useState({ question: "", options: ["", ""], days: 7 });
   const u = (k, v) => setF((p) => ({ ...p, [k]: v }));
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
-  const { add, say, me } = useApp();
 
   return (
     <Sheet title={tab === "notice" ? "Post a notice" : "Create a poll"} onClose={onClose}>
@@ -184,17 +181,18 @@ export function PostNoticeSheet({ onPost, onClose }) {
           <button className="dashed" style={{ marginBottom: 13 }} onClick={() => setPoll((p) => ({ ...p, options: [...p.options, ""] }))}>+ Add option</button>
           <Input label="Open for (days)" type="number" value={poll.days} onChange={(e) => setPoll((p) => ({ ...p, days: e.target.value }))} />
           {err && <p className="err" style={{ marginBottom: 10 }}>{err}</p>}
-          <Btn block icon={Icons.Poll} onClick={() => {
-            const opts = poll.options.map((t) => t.trim()).filter(Boolean);
-            if (!poll.question.trim() || opts.length < 2) return setErr("Add a question and at least two options");
-            add("polls", {
-              question: poll.question.trim(), createdBy: me.id, at: new Date().toISOString(),
-              closesAt: new Date(Date.now() + Number(poll.days || 7) * 864e5).toISOString(),
-              options: opts.map((t, i) => ({ id: `o${i}`, text: t, votes: 0 })), voters: {},
-            });
-            say("Poll published ✓");
+          <Btn block icon={Icons.Poll} disabled={busy} onClick={async () => {
+            const options = poll.options.map((t) => t.trim()).filter(Boolean);
+            if (!poll.question.trim() || options.length < 2) return setErr("Add a question and at least two options");
+            setBusy(true);
+            /* Published through the caller for the same reason as a notice: the
+               list that shows the poll is the one that refreshes, and a refusal
+               from the server is reported here rather than swallowed. */
+            const res = await onPoll({ question: poll.question.trim(), options, days: Number(poll.days || 7) });
+            setBusy(false);
+            if (res?.ok === false) return setErr(res.error?.message || "Could not publish the poll");
             onClose();
-          }}>Publish poll</Btn>
+          }}>{busy ? "Publishing…" : "Publish poll"}</Btn>
         </>
       )}
     </Sheet>

@@ -108,6 +108,18 @@ export const noticeReactionSchema = z.object({
   emoji: z.string().trim().min(1).max(8),
 });
 
+export const createPollSchema = z.object({
+  question: z.string().trim().min(5, "Ask a question").max(240),
+  options: z.array(z.string().trim().min(1).max(120))
+    .min(2, "A poll needs at least two options")
+    .max(10, "Ten options is plenty"),
+  days: z.coerce.number().int().min(1).max(60).default(7),
+});
+
+export const votePollSchema = z.object({
+  optionId: z.string().uuid("Choose one of the options"),
+});
+
 export const importFlatsSchema = z.object({
   csv: z.string().min(1, "Paste or upload a CSV first").max(2_000_000),
   mode: z.enum(["preview", "apply"]).default("preview"),

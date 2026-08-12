@@ -5,7 +5,7 @@ import { NoticeCard } from "../components/entities";
 import { PostNoticeSheet } from "../components/sheets";
 import { useApp } from "../store";
 import { useNotices } from "../data/notices";
-import { useActions } from "../store/actions";
+import { usePolls } from "../data/polls";
 import { ago, fmtDate, inr, pct, uid, iso } from "../lib/format";
 
 const TABS = [
@@ -16,12 +16,15 @@ const TABS = [
 ];
 
 export default function Community({ nav }) {
-  const { db, me, can, sel, add, say, patch } = useApp();
-  const A = useActions();
+  const { can } = useApp();
   const {
     notices, unread, loading: noticesLoading, error: noticesError, refetch: refetchNotices,
     create: postNotice, markRead, react, comment,
   } = useNotices();
+  const {
+    polls, loading: pollsLoading, error: pollsError, refetch: refetchPolls,
+    vote, create: createPoll, close: closePoll,
+  } = usePolls();
   const [tab, setTab] = useState("notices");
   const [sheet, setSheet] = useState(null);
   const [open, setOpen] = useState(null);
@@ -65,18 +68,37 @@ export default function Community({ nav }) {
       {tab === "polls" && (
         <>
           <div className="row" style={{ marginBottom: 12 }}>
-            <p className="muted">{db.polls.length} polls</p>
+            <p className="muted">{polls.length} polls</p>
             {can("poll.write") && <Btn size="sm" icon={Icons.Plus} onClick={() => setSheet("post")}>New poll</Btn>}
           </div>
-          {db.polls.map((p) => <PollCard key={p.id} p={p} onVote={(o) => A.vote(p, o)} me={me} />)}
-          {!db.polls.length && <Empty icon={Icons.Poll} title="No polls running" />}
+          {pollsError && (
+            <Alert kind="err" icon={Icons.AlertTri}>
+              {pollsError.message}{" "}
+              <button className="linkbtn" style={{ color: "inherit", textDecoration: "underline" }} onClick={refetchPolls}>Retry</button>
+            </Alert>
+          )}
+          {pollsLoading ? <SkeletonList rows={2} /> : (
+            <>
+              {polls.map((p) => (
+                <PollCard key={p.id} p={p} onVote={(o) => vote(p, o)}
+                  onClose={can("poll.write") ? closePoll : null} />
+              ))}
+              {!polls.length && (
+                <Empty icon={Icons.Poll} title="No polls running"
+                  note={can("poll.write") ? "Ask the society a question — everyone gets one vote." : "Polls from the committee appear here."} />
+              )}
+            </>
+          )}
         </>
       )}
 
       {tab === "forum" && <Forum kinds={["discussion", "recommendation"]} onNew={() => setSheet("post-forum")} />}
       {tab === "market" && <Forum kinds={["classified"]} onNew={() => setSheet("post-forum")} market />}
 
-      {sheet === "post" && <PostNoticeSheet onPost={postNotice} onClose={() => setSheet(null)} />}
+      {sheet === "post" && (
+        <PostNoticeSheet onPost={postNotice} onPoll={createPoll}
+          tab={tab === "polls" ? "poll" : "notice"} onClose={() => setSheet(null)} />
+      )}
       {sheet === "post-forum" && <NewPostSheet onClose={() => setSheet(null)} />}
       {openNotice && (
         <NoticeSheet n={openNotice} onReact={react} onComment={comment} onClose={() => setOpen(null)} />
@@ -85,34 +107,47 @@ export default function Community({ nav }) {
   );
 }
 
-function PollCard({ p, onVote, me }) {
-  const total = p.options.reduce((s, o) => s + o.votes, 0) || 1;
-  const voted = p.voters?.[me.id];
-  const closed = new Date(p.closesAt) < new Date();
+function PollCard({ p, onVote, onClose }) {
+  /* `resultsHidden` comes from the server, which withholds the tallies until
+     this person has voted — so there is nothing here to reveal by reading the
+     network tab, and the card renders what it was actually given. */
+  const show = !p.resultsHidden;
+  const total = p.total || 0;
+  const voted = p.myVote;
+
   return (
     <div className="card">
       <div className="row" style={{ marginBottom: 9 }}>
-        <Badge color={closed ? "" : "green"}>{closed ? "Closed" : "Open"}</Badge>
-        <span className="tiny">{total} votes · closes {fmtDate(p.closesAt)}</span>
+        <Badge color={p.closed ? "" : "green"}>{p.closed ? "Closed" : "Open"}</Badge>
+        <span className="tiny">
+          {show ? `${total} vote${total === 1 ? "" : "s"}` : "Results after you vote"}
+          {" · "}{p.closed ? "closed" : "closes"} {fmtDate(p.closesAt)}
+        </span>
       </div>
       <p className="h3" style={{ marginBottom: 12 }}>{p.question}</p>
       {p.options.map((o) => {
-        const share = pct(o.votes, total);
         const mine = voted === o.id;
         return (
           <div key={o.id} style={{ marginBottom: 10 }}>
-            <button className="dashed" disabled={!!voted || closed} onClick={() => onVote(o.id)}
-              style={{ textAlign: "left", borderStyle: voted || closed ? "solid" : "dashed", borderColor: mine ? "var(--brand)" : "var(--line2)", background: mine ? "var(--brand-soft)" : "none", color: "var(--ink)", marginBottom: 5 }}>
+            <button className="dashed" disabled={!!voted || p.closed} onClick={() => onVote(o.id)}
+              style={{ textAlign: "left", borderStyle: voted || p.closed ? "solid" : "dashed", borderColor: mine ? "var(--accent)" : "var(--line)", background: mine ? "var(--accent-soft)" : "none", color: "var(--ink)", marginBottom: 5 }}>
               <span className="row" style={{ width: "100%" }}>
                 <span style={{ fontWeight: mine ? 700 : 600 }}>{mine && "✓ "}{o.text}</span>
-                {(voted || closed) && <span className="tiny" style={{ fontWeight: 700 }}>{share}%</span>}
+                {show && <span className="tiny" style={{ fontWeight: 700 }}>{pct(o.votes, total || 1)}%</span>}
               </span>
             </button>
-            {(voted || closed) && <Bar value={o.votes} max={total} color={mine ? "var(--brand)" : "var(--line2)"} />}
+            {show && <Bar value={o.votes} max={total || 1} color={mine ? "var(--accent)" : "var(--line)"} />}
           </div>
         );
       })}
-      {!voted && !closed && <p className="hint">One vote per registered resident. Results are visible after you vote.</p>}
+      <div className="row" style={{ marginTop: 4 }}>
+        {!voted && !p.closed
+          ? <p className="hint">One vote per registered resident. Results are visible after you vote.</p>
+          : <p className="hint">{p.createdBy ? `Asked by ${p.createdBy}` : ""}</p>}
+        {onClose && !p.closed && (
+          <button className="linkbtn" onClick={() => onClose(p)}>Close poll</button>
+        )}
+      </div>
     </div>
   );
 }

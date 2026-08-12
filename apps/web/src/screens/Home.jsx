@@ -4,18 +4,18 @@ import { Badge, Btn, Stat, Alert, Empty , EmojiTile} from "../components/ui";
 import { NoticeCard, VisitorCard, ApproveDeny, QuickAction, OverstayPill, HelpRow } from "../components/entities";
 import { PreApproveSheet, RaiseTicketSheet } from "../components/sheets";
 import { useApp } from "../store";
-import { useActions } from "../store/actions";
 import { useVisitors } from "../data/visitors";
 import { useMyBills } from "../data/bills";
 import { useNotices } from "../data/notices";
+import { usePolls } from "../data/polls";
 import { inr, lakh, cycleLabel, fmtDate, pct, thisCycle, fmtTime } from "../lib/format";
 
 export default function Home({ nav }) {
   const { db, me, can, sel } = useApp();
-  const A = useActions();
   const { visitors, transition } = useVisitors();
   const { bills, dues } = useMyBills();
   const { notices } = useNotices();
+  const { openForMe: openPoll, vote } = usePolls();
   const [sheet, setSheet] = useState(null);
 
   const flat = me.flat;
@@ -26,7 +26,6 @@ export default function Home({ nav }) {
   const helpIn = help.filter((h) => h.status === "in");
   const myTickets = db.tickets.filter((t) => t.flatCode === flat && t.status !== "closed");
   const myBookings = db.bookings.filter((b) => b.userId === me.id && b.status !== "cancelled" && b.date >= new Date().toISOString().slice(0, 10));
-  const openPoll = db.polls.find((p) => !p.voters?.[me.id] && new Date(p.closesAt) > new Date());
 
   const cycle = thisCycle();
   const billed = sel.billed(cycle);
@@ -136,11 +135,14 @@ export default function Home({ nav }) {
           <div className="card">
             <p className="h3" style={{ marginBottom: 10 }}>{openPoll.question}</p>
             {openPoll.options.map((o) => (
-              <button key={o.id} className="dashed" style={{ marginBottom: 7, textAlign: "left" }} onClick={() => A.vote(openPoll, o.id)}>
+              <button key={o.id} className="dashed" style={{ marginBottom: 7, textAlign: "left" }} onClick={() => vote(openPoll, o.id)}>
                 {o.text}
               </button>
             ))}
-            <p className="tiny">Closes {fmtDate(openPoll.closesAt)} · {openPoll.options.reduce((s, o) => s + o.votes, 0)} votes so far</p>
+            {/* No turnout here: the tallies are withheld until this person has
+                voted, so quoting a count would be quoting a number the server
+                deliberately did not send. */}
+            <p className="tiny">Closes {fmtDate(openPoll.closesAt)} · results after you vote</p>
           </div>
         </>
       )}
