@@ -452,3 +452,32 @@ export function buildSeed() {
     announcementsRead: [],
   };
 }
+
+/**
+ * The same shape as the seed, with nothing in it.
+ *
+ * A real society must never be shown another society's data. The screens that
+ * have no endpoint yet read this store, and seeding it meant a brand-new
+ * society opened onto Green Valley's notices, its ledger, and — worse — its
+ * residents by name and flat number. Empty is the honest state: those screens
+ * show their empty case until each one is migrated.
+ *
+ * Derived from the seed rather than listed by hand, so a collection added to
+ * the seed later cannot be forgotten here and leak.
+ */
+export function emptyStore() {
+  const seeded = buildSeed();
+  const out = { version: seeded.version, settings: seeded.settings };
+  for (const [key, value] of Object.entries(seeded)) {
+    if (key === "version" || key === "settings") continue;
+    out[key] = Array.isArray(value) ? [] : value && typeof value === "object" ? {} : value;
+  }
+  /* The society's own name, address and rules arrive from the server and
+     replace these; the rest are neutral defaults rather than Green Valley's. */
+  out.settings = {
+    ...seeded.settings,
+    societyName: "", address: "", regNo: "", gstin: "", flatCount: 0, blocks: [],
+    bank: { name: "", account: "", ifsc: "" },
+  };
+  return out;
+}
