@@ -90,7 +90,6 @@ const NOTICE_KIND = {
 };
 
 export function NoticeCard({ n, onOpen }) {
-  const { sel } = useApp();
   const k = NOTICE_KIND[n.kind] || NOTICE_KIND.notice;
   return (
     <div className="card tap" onClick={onOpen} role="button">
@@ -105,7 +104,10 @@ export function NoticeCard({ n, onOpen }) {
       <p className="h3" style={{ marginBottom: 5 }}>{n.title}</p>
       <p className="muted clamp3">{n.body}</p>
       <div className="row" style={{ marginTop: 11 }}>
-        <span className="tiny">{sel.userName(n.author)}</span>
+        {/* Already a name: the repository resolves it in demo mode, and the API
+            sends it in live mode, since only the server can look up a user the
+            browser was never given. */}
+        <span className="tiny">{n.author}</span>
         <div className="wrap">
           {Object.entries(n.reactions || {}).map(([e, c]) => (
             <span key={e} className="badge bare">{e} {c}</span>
@@ -173,7 +175,8 @@ export function HelpRow({ h, right, onClick }) {
             {h.status === "in" ? `In since ${fmtTime(h.lastIn)}` : "Outside"}
           </Badge>
           {h.policeVerified && <Badge>Police verified</Badge>}
-          <span className="tiny">{h.rating} ★</span>
+          {/* Nobody has rated them yet is a fact worth stating; "null ★" is not. */}
+          <span className="tiny">{h.rating ? `${h.rating} ★` : "Not rated"}</span>
         </div>
       </div>
       {right}
@@ -187,12 +190,20 @@ export function IncidentRow({ i }) {
   return (
     <div className="li">
       <div className="grow">
-        <p className="h4" style={{ textTransform: "capitalize" }}>{i.type} · {i.involves}</p>
+        {/* Only the type is capitalised. Applying it to the whole line re-cased
+            the guard's own words — "flat b-204" came back as "Flat B-204", and
+            a register that rewrites what was written is a poor register. */}
+        <p className="h4">
+          <span style={{ textTransform: "capitalize" }}>{i.type}</span> · {i.involves}
+        </p>
         <p className="tiny" style={{ marginTop: 3 }}>{i.note}</p>
         <div className="wrap" style={{ marginTop: 6, gap: 12 }}>
           <Badge color={color}>{i.severity} severity</Badge>
           <Badge color={i.status === "open" ? "amber" : "green"}>{i.status}</Badge>
-          <span className="tiny">{sel.userName(i.by)} · {fmtDateTime(i.at)}</span>
+          {/* The server sends the name; the seeded store keeps an id and looks
+              it up. Without the first branch the live register showed "—" where
+              the guard's name belongs. */}
+          <span className="tiny">{i.byName || sel.userName(i.by)} · {fmtDateTime(i.at)}</span>
         </div>
       </div>
     </div>

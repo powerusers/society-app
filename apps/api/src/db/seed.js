@@ -264,6 +264,135 @@ export async function seed({ silent = false } = {}) {
     }
     await c.query("SELECT setval('ticket_ref_seq', 2045)");
 
+    /* ---- the incident register: two closed, one still open ---- */
+    for (const [type, severity, involves, note, hoursAgo, by, status] of [
+      ["misbehaviour", "high", "Visitor at Main Gate",
+        "Visitor refused to share ID and argued with the guard. Gate recording captured.", 20, guard.id, "open"],
+      ["overstay", "medium", "Delivery executive · C-204",
+        "Exceeded the 20-minute in-building limit by 14 minutes.", 5, guard.id, "closed"],
+      ["safety", "low", "Basement P2",
+        "Parking light not working — reported to the facility manager.", 50, manager.id, "closed"],
+    ]) {
+      const at = new Date(Date.now() - hoursAgo * 36e5);
+      await c.query(
+        `INSERT INTO incidents (society_id, type, severity, involves, note, gate_id, raised_by, recording_ref,
+                                status, closed_by, closed_at, created_at)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
+        [society.id, type, severity, involves, note, gates[0].id, by, `REC-${4000 + hoursAgo}`,
+          status, status === "closed" ? secretary.id : null,
+          status === "closed" ? new Date(at.getTime() + 2 * 36e5) : null, at],
+      );
+    }
+
+    /* ---- daily help, the flats they work at, and a week of attendance ---- */
+    const helpRoles = ["Maid", "Cook", "Driver", "Nanny", "Dog walker", "Newspaper", "Milkman", "Tutor"];
+    const helpIds = [];
+    for (let i = 0; i < 22; i++) {
+      /* The first three work at the demo flat, so the resident's screen has
+         something in it; the rest are spread across the society. */
+      const worksAt = i === 0 ? ["A-401", "A-402"] : i === 1 ? ["A-401"] : i === 2 ? ["A-401", "B-201"]
+        : Array.from({ length: int(1, 3) }, () => pick(flats).code).filter((v, j, a) => a.indexOf(v) === j);
+      const { rows: [row] } = await c.query(
+        `INSERT INTO daily_help (society_id, name, role, phone, card_code, biometric, police_verified)
+         VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id`,
+        [society.id, personName(), i < 3 ? ["Maid", "Cook", "Driver"][i] : pick(helpRoles),
+          phone(), `H${String(i + 101).padStart(5, "0")}`, chance(0.7), chance(0.6)],
+      );
+      helpIds.push({ id: row.id, flats: worksAt, inside: chance(0.4) });
+      for (const code of worksAt) {
+        await c.query("INSERT INTO daily_help_flats (help_id, flat_id) VALUES ($1,$2) ON CONFLICT DO NOTHING",
+          [row.id, flatByCode.get(code).id]);
+      }
+      /* Ratings from the households they work for, so the average is an
+         average of opinions rather than one number. */
+      for (const code of worksAt) {
+        if (chance(0.6)) {
+          await c.query("INSERT INTO help_ratings (help_id, flat_id, stars) VALUES ($1,$2,$3) ON CONFLICT DO NOTHING",
+            [row.id, flatByCode.get(code).id, int(3, 5)]);
+        }
+      }
+    }
+
+    for (const h of helpIds) {
+      for (let d = 6; d >= 0; d--) {
+        if (!chance(0.85)) continue;
+        const inAt = new Date(Date.now() - d * 864e5);
+        inAt.setHours(int(7, 10), int(0, 59), 0, 0);
+        /* Today's visit is left open for the few who are inside now — that is
+           what "inside" means here, rather than a status column. */
+        const stillIn = d === 0 && h.inside;
+        const outAt = stillIn ? null : new Date(inAt.getTime() + int(45, 200) * 60e3);
+        await c.query(
+          `INSERT INTO help_attendance (society_id, help_id, in_at, out_at, mode, gate_id)
+           VALUES ($1,$2,$3,$4,$5,$6)`,
+          [society.id, h.id, inAt, outAt, chance(0.7) ? "biometric" : "qr", pick(gates).id],
+        );
+      }
+    }
+
+    /* ---- registered vehicles, with their allotted slots ---- */
+    for (const [who, flatCode, kind, model, number, slot, sticker] of [
+      [rahul.id, "A-401", "Car", "Hyundai Creta", "MH12AB1234", "P1-42", 421],
+      [rahul.id, "A-401", "Bike", "Honda Activa", "MH12CD5678", "B-15", 422],
+      [treasurer.id, "B-201", "EV", "Tata Nexon EV", "MH12EF9012", "P1-08", 311],
+    ]) {
+      await c.query(
+        `INSERT INTO vehicles (society_id, flat_id, owner_id, kind, model, number, slot, sticker_no)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
+        [society.id, flatByCode.get(flatCode).id, who, kind, model, number, slot, sticker],
+      );
+    }
+
+    /* ---- amenities, the classes in them, and a diary with a clash to see ---- */
+    const amenityIds = {};
+    for (const [name, emoji, capacity, charge, deposit, slots, rules, approval] of [
+      ["Clubhouse Hall", "🏛️", 120, 2500, 5000, ["09:00–13:00", "14:00–18:00", "19:00–23:00"],
+        "No loud music after 10 PM. Deposit refunded after inspection.", true],
+      ["Swimming Pool", "🏊", 25, 0, 0, ["06:00–08:00", "08:00–10:00", "17:00–19:00", "19:00–21:00"],
+        "Swim cap mandatory. Children under 10 need an adult.", false],
+      ["Gymnasium", "🏋️", 15, 0, 0, ["05:30–07:30", "07:30–09:30", "18:00–20:00", "20:00–22:00"],
+        "Wipe equipment after use.", false],
+      ["Badminton Court", "🏸", 4, 150, 0, ["06:00–07:00", "07:00–08:00", "18:00–19:00", "19:00–20:00", "20:00–21:00"],
+        "Non-marking shoes only.", false],
+      ["Party Lawn", "🌿", 80, 4000, 8000, ["11:00–15:00", "18:00–23:00"],
+        "Catering vendors need a gate pass 24h in advance.", true],
+      ["Co-working Room", "💻", 8, 100, 0, ["09:00–13:00", "14:00–18:00"],
+        "Silence zone. Calls in the booth only.", false],
+    ]) {
+      const { rows: [row] } = await c.query(
+        `INSERT INTO amenities (society_id, name, emoji, capacity, charge, deposit, slots, rules, requires_approval)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING id`,
+        [society.id, name, emoji, capacity, charge, deposit, slots, rules, approval],
+      );
+      amenityIds[name] = row.id;
+    }
+
+    for (const [name, emoji, trainer, days, time, fee, seats, at] of [
+      ["Yoga — morning batch", "🧘", "Asha Menon", "Mon / Wed / Fri", "06:30 – 07:30", 800, 20, "Clubhouse Hall"],
+      ["Kids Karate", "🥋", "Sensei Rakesh", "Tue / Thu", "17:30 – 18:30", 1200, 24, "Clubhouse Hall"],
+      ["Zumba", "💃", "Nidhi Kapoor", "Sat / Sun", "08:00 – 09:00", 900, 25, "Clubhouse Hall"],
+      ["Swimming coaching", "🏊", "Coach Vinod", "Mon – Fri", "16:00 – 17:00", 1800, 12, "Swimming Pool"],
+    ]) {
+      await c.query(
+        `INSERT INTO amenity_classes (society_id, amenity_id, name, emoji, trainer, days, time, fee, seats)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+        [society.id, amenityIds[at], name, emoji, trainer, days, time, fee, seats],
+      );
+    }
+
+    const inDays = (n) => new Date(Date.now() + n * 864e5).toISOString().slice(0, 10);
+    for (const [who, flatCode, at, days, slot, guests, amount, status, note] of [
+      [rahul.id, "A-401", "Clubhouse Hall", 4, "19:00–23:00", 60, 2500, "confirmed", "Birthday party"],
+      [rahul.id, "A-401", "Badminton Court", 1, "19:00–20:00", 4, 150, "confirmed", ""],
+      [treasurer.id, "B-201", "Party Lawn", 6, "18:00–23:00", 75, 4000, "pending", "Anniversary"],
+    ]) {
+      await c.query(
+        `INSERT INTO amenity_bookings (society_id, amenity_id, user_id, flat_id, booking_date, slot, guests, note, amount, status)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
+        [society.id, amenityIds[at], who, flatByCode.get(flatCode).id, inDays(days), slot, guests, note, amount, status],
+      );
+    }
+
     /* ---- pending registrations for the approval queue ---- */
     for (const [name, code, relation, email] of [
       ["Priya Sharma", "B-302", "owner", "priya.new@email.com"],

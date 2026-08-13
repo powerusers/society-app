@@ -65,6 +65,8 @@ export const visitor = (v) => ({
   recurring: v.recurring,
   expectedAt: v.expected_at,
   raisedBy: v.raised_by,
+  /* Which guard let them in — what the performance board counts. */
+  verifiedBy: v.verified_by ?? null,
   denyReason: v.deny_reason,
   sentAt: v.sent_at,
   approvedAt: v.approved_at,

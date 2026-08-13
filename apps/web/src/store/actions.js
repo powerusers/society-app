@@ -7,7 +7,7 @@ import { code6, iso, uid, thisCycle, shiftCycle } from "../lib/format";
 
 /** Domain operations shared by more than one screen. */
 export function useActions() {
-  const { db, me, add, patch, setColl, setDb, say, logAudit, sel } = useApp();
+  const { db, me, add, patch, remove, setColl, setDb, say, logAudit, sel } = useApp();
 
   return useMemo(() => {
     /* ---------------- gate ---------------- */
@@ -63,6 +63,12 @@ export function useActions() {
       logAudit("incident.create", data.type, data.note?.slice(0, 80));
       return i;
     };
+
+    const closeIncident = (id, note = "") =>
+      patch("incidents", id, { status: "closed", closedAt: iso(), closedBy: me.id, closingNote: note });
+
+    const reopenIncident = (id) =>
+      patch("incidents", id, { status: "open", closedAt: null, closedBy: null, closingNote: "" });
 
     const logPatrol = (checkpointId, note = "") => {
       add("patrols", { checkpointId, guardId: me.id, at: iso(), note, geo: { lat: 18.52, lng: 73.85 } });
@@ -135,14 +141,89 @@ export function useActions() {
       say("Vote recorded ✓");
     };
 
+    /* The demo poll is shaped like the seeded ones — a voters map and per-option
+       counts — so the same normalisation in the repository can hide the tallies
+       here too, and the demo behaves like the real thing. */
+    const createPoll = ({ question, options, days = 7 }) => {
+      const p = add("polls", {
+        question, createdBy: me.id, at: iso(),
+        closesAt: new Date(Date.now() + Number(days) * 864e5).toISOString(),
+        options: options.map((text, i) => ({ id: `o${i}`, text, votes: 0 })),
+        voters: {},
+      });
+      say("Poll published ✓");
+      logAudit("poll.create", question, `${options.length} options`);
+      return p;
+    };
+
+    /* The residents' board in demo mode. `likes` stays a counter here because
+       the seeded posts arrive with one; the live board counts people. */
+    const createPost = ({ type, title, body, price }) => {
+      const p = add("forum", {
+        type, title, body: body || "", by: me.id, at: iso(), likes: 0, comments: [],
+        ...(type === "classified" ? { price: Number(price || 0) } : {}),
+      });
+      say("Posted to the community ✓");
+      return p;
+    };
+
+    const likePost = (id) => patch("forum", id, (p) => ({ likes: p.likes + 1 }));
+
+    const replyToPost = (id, text) =>
+      patch("forum", id, (p) => ({ comments: [...p.comments, { id: uid("fc"), by: me.id, at: iso(), text }] }));
+
+    const removePost = (id) => { remove("forum", id); say("Post removed"); };
+
     const book = (data) => {
       const clash = db.bookings.some((b) => b.amenityId === data.amenityId && b.date === data.date && b.slot === data.slot && b.status !== "cancelled");
       if (clash) { say("That slot is already booked.", "bad"); return null; }
-      const b = add("bookings", { ...data, userId: me.id, flatCode: me.flat, status: data.amount > 2000 ? "pending" : "confirmed" });
+      /* Whether it needs approving is the amenity's property here too, so the
+         demo behaves like the live board rather than guessing from the amount. */
+      const a = sel.amenity(data.amenityId);
+      const b = add("bookings", {
+        ...data, userId: me.id, flatCode: me.flat, amount: a?.charge ?? data.amount ?? 0,
+        status: a?.requiresApproval ? "pending" : "confirmed",
+      });
       say(b.status === "pending" ? "Requested — committee approval needed for this amenity." : "Booked ✓");
       logAudit("amenity.book", sel.amenity(data.amenityId)?.name, `${data.date} ${data.slot}`);
       return b;
     };
+
+    const decideBooking = (id, status) => patch("bookings", id, { status, decidedAt: iso(), decidedBy: me.id });
+
+    const addVehicle = (data) => {
+      const v = add("vehicles", {
+        ...data, ownerId: me.id, flatCode: me.flat,
+        sticker: String(db.vehicles.length + 501).padStart(4, "0"),
+      });
+      logAudit("vehicle.add", v.number, `${v.kind} · ${me.flat}`);
+      return v;
+    };
+
+    const removeVehicle = (id) => { remove("vehicles", id); say("Vehicle removed"); };
+
+    const addHelp = (data) => {
+      const h = add("dailyHelp", {
+        ...data, flats: [me.flat], cardCode: code6(), verified: true,
+        rating: 5, status: "out", lastIn: null, photo: null,
+      });
+      logAudit("help.add", h.name, `${h.role} for ${me.flat}`);
+      return h;
+    };
+
+    const updateHelp = (id, body) => patch("dailyHelp", id, body);
+
+    const removeHelp = (id) => { remove("dailyHelp", id); say("Removed from your flat"); };
+
+    const rateHelp = (id, stars) => { patch("dailyHelp", id, { rating: stars }); say("Rating saved"); };
+
+    const addAmenity = (data) => add("amenities", { ...data, active: true });
+
+    const addClass = (data) => add("classes", { ...data, enrolled: 0 });
+
+    /* Demo enrolment stays a counter because the seeded classes arrive with
+       one; the live board counts people. */
+    const enrol = (id) => patch("classes", id, (c) => ({ enrolled: c.enrolled + 1 }));
 
     /* ---------------- billing / accounts ---------------- */
     /* Preview only. When the API is wired in, the amount a resident is charged is
@@ -255,10 +336,14 @@ export function useActions() {
       sendToFlat, approveVisitor, denyVisitor, admitVisitor, exitVisitor, preApprove, selfCheckin,
       raiseIncident, logPatrol, markHelp,
       raiseTicket, commentTicket, setTicketStatus, slaFor,
-      postNotice, react, markRead, vote, book,
+      postNotice, react, markRead, vote, createPoll, book,
+      createPost, likePost, replyToPost, removePost,
+      decideBooking, addAmenity, addClass, enrol, addVehicle, removeVehicle,
+      addHelp, updateHelp, removeHelp, rateHelp,
+      closeIncident, reopenIncident,
       computeBill, generateBills, approveRun, rejectRun, payBill, addLedger, reconcile,
       approveRegistration, rejectRegistration,
       cycles: { current: thisCycle(), next: shiftCycle(thisCycle(), 1) },
     };
-  }, [db, me, add, patch, setColl, setDb, say, logAudit, sel]);
+  }, [db, me, add, patch, remove, setColl, setDb, say, logAudit, sel]);
 }

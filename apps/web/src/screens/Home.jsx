@@ -4,27 +4,31 @@ import { Badge, Btn, Stat, Alert, Empty , EmojiTile} from "../components/ui";
 import { NoticeCard, VisitorCard, ApproveDeny, QuickAction, OverstayPill, HelpRow } from "../components/entities";
 import { PreApproveSheet, RaiseTicketSheet } from "../components/sheets";
 import { useApp } from "../store";
-import { useActions } from "../store/actions";
 import { useVisitors } from "../data/visitors";
 import { useMyBills } from "../data/bills";
+import { useNotices } from "../data/notices";
+import { usePolls } from "../data/polls";
+import { useAmenities } from "../data/amenities";
+import { useHelp } from "../data/help";
 import { inr, lakh, cycleLabel, fmtDate, pct, thisCycle, fmtTime } from "../lib/format";
 
 export default function Home({ nav }) {
   const { db, me, can, sel } = useApp();
-  const A = useActions();
   const { visitors, transition } = useVisitors();
   const { bills, dues } = useMyBills();
+  const { notices } = useNotices();
+  const { openForMe: openPoll, vote } = usePolls();
+  const { mine: bookings } = useAmenities();
+  const { mine: help } = useHelp();
   const [sheet, setSheet] = useState(null);
 
   const flat = me.flat;
   const dueBill = bills.find((b) => b.status !== "paid");
   const pending = visitors.filter((v) => v.status === "pending" && v.flatCode === flat);
   const inside = visitors.filter((v) => v.status === "inside" && v.flatCode === flat);
-  const help = sel.helpOf(flat);
   const helpIn = help.filter((h) => h.status === "in");
   const myTickets = db.tickets.filter((t) => t.flatCode === flat && t.status !== "closed");
-  const myBookings = db.bookings.filter((b) => b.userId === me.id && b.status !== "cancelled" && b.date >= new Date().toISOString().slice(0, 10));
-  const openPoll = db.polls.find((p) => !p.voters?.[me.id] && new Date(p.closesAt) > new Date());
+  const myBookings = bookings.filter((b) => b.status !== "cancelled" && b.date >= new Date().toISOString().slice(0, 10));
 
   const cycle = thisCycle();
   const billed = sel.billed(cycle);
@@ -33,18 +37,31 @@ export default function Home({ nav }) {
   return (
     <>
       {/* dues / welcome */}
-      <div className="panel">
-        <p className="tiny">{dues ? "Outstanding" : "Nothing outstanding"}</p>
-        <p className="h1" style={{ marginTop: 6 }}>{inr(dues)}</p>
-        <p className="tiny" style={{ marginTop: 6 }}>
-          {dueBill ? `${cycleLabel(dueBill.cycle)} · due ${fmtDate(dueBill.dueDate)}` : `Flat ${flat} is fully paid up.`}
-        </p>
-        {dueBill && (
-          <Btn variant="white" block style={{ marginTop: 14 }} onClick={() => nav.switchTab("payments")}>
-            Pay {inr(dueBill.total)}
-          </Btn>
-        )}
-      </div>
+      {/* A committee member or administrator need not live here. Showing them a
+          dues panel for a flat they do not have produced "Flat null is fully
+          paid up" on the first screen after sign-in. */}
+      {flat ? (
+        <div className="panel">
+          <p className="tiny">{dues ? "Outstanding" : "Nothing outstanding"}</p>
+          <p className="h1" style={{ marginTop: 6 }}>{inr(dues)}</p>
+          <p className="tiny" style={{ marginTop: 6 }}>
+            {dueBill ? `${cycleLabel(dueBill.cycle)} · due ${fmtDate(dueBill.dueDate)}` : `Flat ${flat} is fully paid up.`}
+          </p>
+          {dueBill && (
+            <Btn variant="white" block style={{ marginTop: 14 }} onClick={() => nav.switchTab("payments")}>
+              Pay {inr(dueBill.total)}
+            </Btn>
+          )}
+        </div>
+      ) : (
+        <div className="panel">
+          <p className="tiny">Signed in as</p>
+          <p className="h1" style={{ marginTop: 6 }}>{me.name}</p>
+          <p className="tiny" style={{ marginTop: 6 }}>
+            {[me.designation, db.settings.societyName].filter(Boolean).join(" · ")}
+          </p>
+        </div>
+      )}
 
       {/* live gate activity */}
       {pending.length > 0 && (
@@ -78,8 +95,11 @@ export default function Home({ nav }) {
       {/* quick actions */}
       <div className="sect"><h2 className="h2">Quick actions</h2></div>
       <div className="grid2">
-        <QuickAction icon={Icons.UserPlus} label={"Pre-approve\nvisitor"} onClick={() => setSheet("pre")} />
-        <QuickAction icon={Icons.Ticket} label={"Raise a\ncomplaint"} onClick={() => setSheet("ticket")} />
+        {/* Both of these raise something against a flat, and the server refuses
+            a caller who is not a member of one — so they are offered only to
+            someone who has a flat to raise them for. */}
+        {flat && <QuickAction icon={Icons.UserPlus} label={"Pre-approve\nvisitor"} onClick={() => setSheet("pre")} />}
+        {flat && <QuickAction icon={Icons.Ticket} label={"Raise a\ncomplaint"} onClick={() => setSheet("ticket")} />}
         <QuickAction icon={Icons.Calendar} label={"Book an\namenity"} onClick={() => nav.go("amenities")} />
         <QuickAction icon={Icons.Users} label={"Daily help\n& staff"} onClick={() => nav.go("dailyHelp")} />
         <QuickAction icon={Icons.Car} label={"Vehicles &\nparking"} onClick={() => nav.go("vehicles")} />
@@ -118,11 +138,14 @@ export default function Home({ nav }) {
           <div className="card">
             <p className="h3" style={{ marginBottom: 10 }}>{openPoll.question}</p>
             {openPoll.options.map((o) => (
-              <button key={o.id} className="dashed" style={{ marginBottom: 7, textAlign: "left" }} onClick={() => A.vote(openPoll, o.id)}>
+              <button key={o.id} className="dashed" style={{ marginBottom: 7, textAlign: "left" }} onClick={() => vote(openPoll, o.id)}>
                 {o.text}
               </button>
             ))}
-            <p className="tiny">Closes {fmtDate(openPoll.closesAt)} · {openPoll.options.reduce((s, o) => s + o.votes, 0)} votes so far</p>
+            {/* No turnout here: the tallies are withheld until this person has
+                voted, so quoting a count would be quoting a number the server
+                deliberately did not send. */}
+            <p className="tiny">Closes {fmtDate(openPoll.closesAt)} · results after you vote</p>
           </div>
         </>
       )}
@@ -170,9 +193,9 @@ export default function Home({ nav }) {
           <div className="list">
             {myBookings.map((b) => (
               <div key={b.id} className="li">
-                <EmojiTile>{sel.amenity(b.amenityId)?.emoji}</EmojiTile>
+                <EmojiTile>{b.amenityEmoji}</EmojiTile>
                 <div className="grow">
-                  <p className="h4">{sel.amenity(b.amenityId)?.name}</p>
+                  <p className="h4">{b.amenityName}</p>
                   <p className="tiny" style={{ marginTop: 2 }}>{fmtDate(b.date)} · {b.slot}</p>
                 </div>
                 <Badge color={b.status === "confirmed" ? "green" : "amber"}>{b.status}</Badge>
@@ -187,10 +210,13 @@ export default function Home({ nav }) {
         <h2 className="h2">Notice board</h2>
         <button className="linkbtn" onClick={() => nav.switchTab("community")}>View all →</button>
       </div>
-      {db.notices.slice(0, 2).map((n) => (
+      {notices.slice(0, 2).map((n) => (
         <NoticeCard key={n.id} n={n} onOpen={() => nav.switchTab("community")} />
       ))}
-      {db.notices.length === 0 && <Empty icon={Icons.Board} title="No notices yet" />}
+      {notices.length === 0 && (
+        <Empty icon={Icons.Board} title="No notices yet"
+          note={can("notice.write") ? "Post one from Community — every resident sees it." : "Notices from the committee appear here."} />
+      )}
 
       {sheet === "pre" && <PreApproveSheet onClose={() => setSheet(null)} />}
       {sheet === "ticket" && <RaiseTicketSheet onClose={() => setSheet(null)} />}

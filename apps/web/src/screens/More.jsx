@@ -40,6 +40,10 @@ export default function More({ nav }) {
       title: "Gate & security",
       show: can("gate.view"),
       items: [
+        /* The vehicle register is under "Your home" for residents. A guard has
+           no flat, so without this the one screen that answers "whose car is
+           this?" would be unreachable by exactly the people at the barrier. */
+        ...(me.flat ? [] : [{ id: "vehicles", icon: Icons.Car, label: "Vehicle register" }]),
         { id: "guardGate", icon: Icons.Gate, label: "Gate console" },
         { id: "guardCheckin", icon: Icons.Finger, label: "Staff check-in" },
         { id: "guardLog", icon: Icons.Clock, label: "Gate log" },

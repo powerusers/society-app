@@ -10,7 +10,7 @@
 export const ROLES = ["admin", "committee", "staff", "guard", "resident"];
 
 export const CAPABILITIES = [
-  "notice.write", "poll.write",
+  "notice.write", "poll.write", "community.moderate",
   "billing.make", "billing.approve",
   "accounts.view", "accounts.write",
   "helpdesk.manage",
@@ -26,8 +26,11 @@ export const CAPABILITIES = [
 export const CAPS = {
   admin: ["*"],
   committee: [
-    "notice.write", "poll.write", "billing.make", "billing.approve", "helpdesk.manage",
+    "notice.write", "poll.write", "community.moderate", "billing.make", "billing.approve", "helpdesk.manage",
     "resident.approve", "amenity.manage", "accounts.view", "accounts.write", "document.write",
+    /* A committee member who witnesses something records it themselves rather
+       than asking the guard to write it up second-hand. */
+    "incident.write",
     "staff.manage", "gate.view", "reports.view", "settings.view",
   ],
   // staff prepare billing runs, so they need to see the run they prepared — but never to approve it

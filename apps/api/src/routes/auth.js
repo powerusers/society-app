@@ -43,6 +43,10 @@ authRouter.post("/login", loginLimiter, validate(loginSchema), wrap(async (req, 
     : await verifyPassword(password, DUMMY_HASH);
 
   if (!user || !ok) throw unauthorized("Email or password is incorrect");
+  /* A suspended account and an unapproved one are different situations, and
+     telling a suspended guard their registration is "awaiting approval" sends
+     them to the wrong person. */
+  if (user.status === "suspended") throw unauthorized("This account has been suspended — ask the committee");
   if (user.status !== "active") throw unauthorized("This account is awaiting committee approval");
 
   const refresh = await issueRefreshToken(user.id);

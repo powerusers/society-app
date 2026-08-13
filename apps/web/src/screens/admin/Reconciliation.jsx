@@ -47,6 +47,7 @@ export default function Reconciliation() {
   const [result, setResult] = useState(null);
   const [slip, setSlip] = useState(false);
 
+  const bank = db.settings.bank || {};
   const unreconciled = db.payments.filter((p) => !p.reconciled);
   const reconciled = db.payments.filter((p) => p.reconciled);
   const pendingValue = unreconciled.reduce((s, p) => s + p.amount, 0);
@@ -57,7 +58,7 @@ export default function Reconciliation() {
   }, [db.payments]);
 
   const fetchStatement = () => {
-    setText(makeStatement(unreconciled.slice(0, 25), db.settings.bank));
+    setText(makeStatement(unreconciled.slice(0, 25), bank));
     say("Statement pulled from the bank feed.");
   };
 
@@ -92,13 +93,23 @@ export default function Reconciliation() {
         <>
           <div className="card">
             <div className="row" style={{ marginBottom: 10 }}>
+              {/* A society set up this morning has no bank account recorded
+                  yet. Saying so beats "A/c ••••undefined" beside a green
+                  "Feed connected" badge — and beats the crash that reading a
+                  missing account number used to produce. */}
               <div className="grow">
-                <p className="h4">{db.settings.bank.name}</p>
-                <p className="tiny" style={{ marginTop: 2 }}>A/c ••••{db.settings.bank.account.slice(-4)} · {db.settings.bank.ifsc}</p>
+                <p className="h4">{bank.name || "No bank account recorded"}</p>
+                <p className="tiny" style={{ marginTop: 2 }}>
+                  {bank.account
+                    ? `A/c ••••${bank.account.slice(-4)}${bank.ifsc ? ` · ${bank.ifsc}` : ""}`
+                    : "Add the society's account under Society settings to pull statements."}
+                </p>
               </div>
-              <Badge color="green">Feed connected</Badge>
+              <Badge color={bank.account ? "green" : "amber"}>{bank.account ? "Feed connected" : "Not configured"}</Badge>
             </div>
-            <Btn block variant="ghost" icon={Icons.Download} onClick={fetchStatement}>Pull today's statement</Btn>
+            <Btn block variant="ghost" icon={Icons.Download} disabled={!bank.account} onClick={fetchStatement}>
+              Pull today's statement
+            </Btn>
           </div>
           <TextArea label="MT940 statement" value={text} onChange={(e) => setText(e.target.value)}
             placeholder="Paste the MT940 text from your bank, or pull it with the button above."

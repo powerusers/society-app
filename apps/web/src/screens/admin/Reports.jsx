@@ -2,10 +2,12 @@ import { useMemo } from "react";
 import Icons from "../../icons";
 import { Badge, Btn, Stat, Alert, Empty } from "../../components/ui";
 import { useApp } from "../../store";
+import { useAmenities } from "../../data/amenities";
 import { inr, lakh, pct, csv, download, cycleLabel, fmtDate, fmtDateTime, thisCycle, shiftCycle, minsBetween, until } from "../../lib/format";
 
 export default function Reports() {
   const { db, sel } = useApp();
+  const { bookings } = useAmenities();
 
   const cycles = useMemo(() => [...new Set(db.bills.map((b) => b.cycle))].sort().slice(-6), [db.bills]);
   const series = cycles.map((c) => ({ c, billed: sel.billed(c), collected: sel.collected(c) }));
@@ -92,10 +94,10 @@ export default function Reports() {
       },
     },
     {
-      id: "amenity", icon: Icons.Calendar, title: "Amenity usage & revenue", note: `${db.bookings.length} bookings`,
+      id: "amenity", icon: Icons.Calendar, title: "Amenity usage & revenue", note: `${bookings.length} bookings`,
       run: () => {
         const head = ["Amenity", "Date", "Slot", "Flat", "Guests", "Amount", "Status"];
-        const rows = db.bookings.map((b) => [sel.amenity(b.amenityId)?.name || "", b.date, b.slot, b.flatCode, b.guests, b.amount, b.status]);
+        const rows = bookings.map((b) => [b.amenityName || "", b.date, b.slot, b.flatCode, b.guests, b.amount, b.status]);
         download("amenity-usage.csv", csv([head, ...rows]));
       },
     },

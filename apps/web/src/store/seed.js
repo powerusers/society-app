@@ -334,11 +334,11 @@ function buildCommunity(flats) {
   ];
 
   const amenities = [
-    { id: "am_1", name: "Clubhouse Hall", emoji: "🏛️", capacity: 120, charge: 2500, deposit: 5000, slots: ["09:00–13:00", "14:00–18:00", "19:00–23:00"], rules: "No loud music after 10 PM. Deposit refunded after inspection." },
+    { id: "am_1", name: "Clubhouse Hall", emoji: "🏛️", capacity: 120, charge: 2500, deposit: 5000, slots: ["09:00–13:00", "14:00–18:00", "19:00–23:00"], rules: "No loud music after 10 PM. Deposit refunded after inspection.", requiresApproval: true },
     { id: "am_2", name: "Swimming Pool", emoji: "🏊", capacity: 25, charge: 0, deposit: 0, slots: ["06:00–08:00", "08:00–10:00", "17:00–19:00", "19:00–21:00"], rules: "Swim cap mandatory. Children under 10 need an adult." },
     { id: "am_3", name: "Gymnasium", emoji: "🏋️", capacity: 15, charge: 0, deposit: 0, slots: ["05:30–07:30", "07:30–09:30", "18:00–20:00", "20:00–22:00"], rules: "Wipe equipment after use." },
     { id: "am_4", name: "Badminton Court", emoji: "🏸", capacity: 4, charge: 150, deposit: 0, slots: ["06:00–07:00", "07:00–08:00", "18:00–19:00", "19:00–20:00", "20:00–21:00"], rules: "Non-marking shoes only." },
-    { id: "am_5", name: "Party Lawn", emoji: "🌿", capacity: 80, charge: 4000, deposit: 8000, slots: ["11:00–15:00", "18:00–23:00"], rules: "Catering vendors need a gate pass 24h in advance." },
+    { id: "am_5", name: "Party Lawn", emoji: "🌿", capacity: 80, charge: 4000, deposit: 8000, slots: ["11:00–15:00", "18:00–23:00"], rules: "Catering vendors need a gate pass 24h in advance.", requiresApproval: true },
     { id: "am_6", name: "Co-working Room", emoji: "💻", capacity: 8, charge: 100, deposit: 0, slots: ["09:00–13:00", "14:00–18:00"], rules: "Silence zone. Calls in the booth only." },
   ];
 

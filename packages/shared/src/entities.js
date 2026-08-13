@@ -48,7 +48,26 @@ export const RELATIONS = ["owner", "co-owner", "tenant"];
 
 export const NOTICE_KINDS = ["notice", "event", "payment", "alert"];
 
-export const INCIDENT_TYPES = ["misbehaviour", "trespass", "safety", "vehicle", "overstay", "other"];
+/* The residents' own board, as opposed to the committee's. A classified carries
+   a price; the other two do not. */
+export const POST_TYPES = ["discussion", "recommendation", "classified"];
+
+export const VEHICLE_KINDS = ["Car", "Bike", "EV"];
+
+export const HELP_ROLES = [
+  "Maid", "Cook", "Driver", "Nanny", "Dog walker", "Newspaper", "Milkman", "Tutor", "Physiotherapist",
+];
+
+/**
+ * Registration numbers, compared the way a gate does.
+ *
+ * "MH-12-AB-1234", "MH 12 AB 1234" and "mh12ab1234" are one car. Normalising
+ * before storing means the uniqueness check and the plate lookup both work
+ * regardless of how the resident typed it.
+ */
+export const normalisePlate = (s) => String(s || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+
+export const INCIDENT_TYPES =["misbehaviour", "trespass", "safety", "vehicle", "overstay", "other"];
 export const SEVERITIES = ["high", "medium", "low"];
 
 export const DEFAULT_SETTINGS = {
