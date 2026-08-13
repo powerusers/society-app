@@ -190,12 +190,20 @@ export function IncidentRow({ i }) {
   return (
     <div className="li">
       <div className="grow">
-        <p className="h4" style={{ textTransform: "capitalize" }}>{i.type} · {i.involves}</p>
+        {/* Only the type is capitalised. Applying it to the whole line re-cased
+            the guard's own words — "flat b-204" came back as "Flat B-204", and
+            a register that rewrites what was written is a poor register. */}
+        <p className="h4">
+          <span style={{ textTransform: "capitalize" }}>{i.type}</span> · {i.involves}
+        </p>
         <p className="tiny" style={{ marginTop: 3 }}>{i.note}</p>
         <div className="wrap" style={{ marginTop: 6, gap: 12 }}>
           <Badge color={color}>{i.severity} severity</Badge>
           <Badge color={i.status === "open" ? "amber" : "green"}>{i.status}</Badge>
-          <span className="tiny">{sel.userName(i.by)} · {fmtDateTime(i.at)}</span>
+          {/* The server sends the name; the seeded store keeps an id and looks
+              it up. Without the first branch the live register showed "—" where
+              the guard's name belongs. */}
+          <span className="tiny">{i.byName || sel.userName(i.by)} · {fmtDateTime(i.at)}</span>
         </div>
       </div>
     </div>

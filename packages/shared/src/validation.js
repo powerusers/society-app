@@ -295,9 +295,14 @@ export const payBillSchema = z.object({
 export const createIncidentSchema = z.object({
   type: z.enum(INCIDENT_TYPES),
   severity: z.enum(SEVERITIES).default("medium"),
-  involves: z.string().trim().min(1).max(200),
-  note: z.string().max(2000).optional().default(""),
-  gateId: z.string().optional(),
+  involves: z.string().trim().min(1, "Say who or what this concerns").max(200),
+  note: z.string().trim().max(2000).optional().default(""),
+  gateId: z.string().uuid().nullish(),
+});
+
+/** Closing one is a review, so the committee may leave what they concluded. */
+export const closeIncidentSchema = z.object({
+  note: z.string().trim().max(1000).optional().default(""),
 });
 
 export const requestUploadSchema = z.object({

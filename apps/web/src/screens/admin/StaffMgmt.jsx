@@ -4,11 +4,13 @@ import { Badge, Btn, Empty, Sheet, Segmented, Stat, Avatar, Input, Select, Alert
 import { HelpRow } from "../../components/entities";
 import { useApp } from "../../store";
 import { useHelp } from "../../data/help";
+import { useIncidents } from "../../data/incidents";
 import { fmtDate, dayKey, uid, iso, code6 } from "../../lib/format";
 
 export default function StaffMgmt() {
   const { db, sel, add, patch, say, logAudit } = useApp();
   const { help, update: updateHelp } = useHelp();
+  const { incidents } = useIncidents();
   const [tab, setTab] = useState("society");
   const [sheet, setSheet] = useState(false);
 
@@ -91,7 +93,7 @@ export default function StaffMgmt() {
                 ...g,
                 scans: todayScans.filter((p) => p.guardId === g.id).length,
                 verified: db.visitors.filter((v) => v.verifiedBy === g.id).length,
-                incidents: db.incidents.filter((i) => i.by === g.id).length,
+                incidents: incidents.filter((i) => i.by === g.id).length,
               }))
               .sort((a, b) => b.scans + b.verified - (a.scans + a.verified))
               .map((g, i) => (

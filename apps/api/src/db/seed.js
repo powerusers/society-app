@@ -264,6 +264,26 @@ export async function seed({ silent = false } = {}) {
     }
     await c.query("SELECT setval('ticket_ref_seq', 2045)");
 
+    /* ---- the incident register: two closed, one still open ---- */
+    for (const [type, severity, involves, note, hoursAgo, by, status] of [
+      ["misbehaviour", "high", "Visitor at Main Gate",
+        "Visitor refused to share ID and argued with the guard. Gate recording captured.", 20, guard.id, "open"],
+      ["overstay", "medium", "Delivery executive · C-204",
+        "Exceeded the 20-minute in-building limit by 14 minutes.", 5, guard.id, "closed"],
+      ["safety", "low", "Basement P2",
+        "Parking light not working — reported to the facility manager.", 50, manager.id, "closed"],
+    ]) {
+      const at = new Date(Date.now() - hoursAgo * 36e5);
+      await c.query(
+        `INSERT INTO incidents (society_id, type, severity, involves, note, gate_id, raised_by, recording_ref,
+                                status, closed_by, closed_at, created_at)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
+        [society.id, type, severity, involves, note, gates[0].id, by, `REC-${4000 + hoursAgo}`,
+          status, status === "closed" ? secretary.id : null,
+          status === "closed" ? new Date(at.getTime() + 2 * 36e5) : null, at],
+      );
+    }
+
     /* ---- daily help, the flats they work at, and a week of attendance ---- */
     const helpRoles = ["Maid", "Cook", "Driver", "Nanny", "Dog walker", "Newspaper", "Milkman", "Tutor"];
     const helpIds = [];

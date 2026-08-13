@@ -4,14 +4,14 @@ import { Badge, Btn, Empty, Stat, Alert, Sheet, Input, Select, TextArea, Chips }
 import { VisitorCard, overstay, CAT, catOf } from "../../components/entities";
 import QR from "../../lib/qr";
 import { useApp } from "../../store";
-import { useActions } from "../../store/actions";
+import { useIncidents } from "../../data/incidents";
 import { useVisitors } from "../../data/visitors";
 import { useGates } from "../../data/gates";
 import { fmtTime, ago } from "../../lib/format";
 
 export default function GuardGate({ nav }) {
   const { db, me, can } = useApp();
-  const A = useActions();
+  const { raise: raiseIncident } = useIncidents();
   const { visitors: allVisitors, loading, error, refetch, transition } = useVisitors();
   const { gates, defaultGateId } = useGates();
   const [pickedGate, setPickedGate] = useState(null);
@@ -121,7 +121,7 @@ export default function GuardGate({ nav }) {
               <VisitorCard key={v.id} v={v} actions={operate && <>
                 <Btn size="sm" variant="ghost" icon={Icons.LogOut} onClick={() => transition(v, "exited")}>Mark exit</Btn>
                 {o?.over && (
-                  <Btn size="sm" variant="danger" icon={Icons.AlertTri} onClick={() => A.raiseIncident({
+                  <Btn size="sm" variant="danger" icon={Icons.AlertTri} onClick={() => raiseIncident({
                     type: "overstay", severity: "medium", gateId, involves: `${v.name} · ${v.flatCode}`,
                     note: `Exceeded the ${o.limit}-minute limit by ${o.by} minutes.`,
                   })}>Log overstay</Btn>
@@ -138,7 +138,7 @@ export default function GuardGate({ nav }) {
 
       {sheet === "entry" && <EntrySheet gateId={gateId} onClose={() => setSheet(null)} />}
       {sheet === "scan" && <ScanSheet gateId={gateId} onClose={() => setSheet(null)} />}
-      {sheet === "incident" && <IncidentSheet gateId={gateId} onClose={() => setSheet(null)} />}
+      {sheet === "incident" && <IncidentSheet gateId={gateId} onRaise={raiseIncident} onClose={() => setSheet(null)} />}
     </>
   );
 }
@@ -232,11 +232,12 @@ function ScanSheet({ gateId, onClose }) {
   );
 }
 
-function IncidentSheet({ gateId, onClose }) {
-  const A = useActions();
+function IncidentSheet({ gateId, onRaise, onClose }) {
   const [f, setF] = useState({ type: "misbehaviour", severity: "high", involves: "", note: "" });
   const u = (k, v) => setF((p) => ({ ...p, [k]: v }));
   const [recording, setRecording] = useState(false);
+  const [err, setErr] = useState("");
+  const [busy, setBusy] = useState(false);
 
   return (
     <Sheet title="Record an incident" onClose={onClose}>
@@ -254,10 +255,14 @@ function IncidentSheet({ gateId, onClose }) {
         options={[{ value: "high", label: "High" }, { value: "medium", label: "Medium" }, { value: "low", label: "Low" }]} />
       <Input label="Who / what is involved" value={f.involves} onChange={(e) => u("involves", e.target.value)} placeholder="e.g. Visitor at Main Gate, flat B-204" />
       <TextArea label="What happened" value={f.note} onChange={(e) => u("note", e.target.value)} />
-      <Btn block variant="danger" icon={Icons.AlertTri} onClick={() => {
-        A.raiseIncident({ ...f, gateId, involves: f.involves || "Unspecified" });
+      {err && <p className="err" style={{ marginBottom: 10 }}>{err}</p>}
+      <Btn block variant="danger" icon={Icons.AlertTri} disabled={busy} onClick={async () => {
+        setBusy(true);
+        const res = await onRaise({ ...f, gateId, involves: f.involves.trim() || "Unspecified" });
+        setBusy(false);
+        if (res?.ok === false) return setErr(res.error?.message || "Could not record that");
         onClose();
-      }}>Save incident & alert committee</Btn>
+      }}>{busy ? "Recording…" : "Save incident & alert committee"}</Btn>
       <p className="hint" style={{ textAlign: "center", marginTop: 10 }}>
         Recording, timestamp and gate device ID are attached automatically — evidence for the committee, protection for the guard.
       </p>

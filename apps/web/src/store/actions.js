@@ -64,6 +64,12 @@ export function useActions() {
       return i;
     };
 
+    const closeIncident = (id, note = "") =>
+      patch("incidents", id, { status: "closed", closedAt: iso(), closedBy: me.id, closingNote: note });
+
+    const reopenIncident = (id) =>
+      patch("incidents", id, { status: "open", closedAt: null, closedBy: null, closingNote: "" });
+
     const logPatrol = (checkpointId, note = "") => {
       add("patrols", { checkpointId, guardId: me.id, at: iso(), note, geo: { lat: 18.52, lng: 73.85 } });
       say("Checkpoint scanned ✓");
@@ -334,6 +340,7 @@ export function useActions() {
       createPost, likePost, replyToPost, removePost,
       decideBooking, addAmenity, addClass, enrol, addVehicle, removeVehicle,
       addHelp, updateHelp, removeHelp, rateHelp,
+      closeIncident, reopenIncident,
       computeBill, generateBills, approveRun, rejectRun, payBill, addLedger, reconcile,
       approveRegistration, rejectRegistration,
       cycles: { current: thisCycle(), next: shiftCycle(thisCycle(), 1) },
