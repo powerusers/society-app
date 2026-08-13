@@ -196,6 +196,21 @@ export function useActions() {
 
     const removeVehicle = (id) => { remove("vehicles", id); say("Vehicle removed"); };
 
+    const addHelp = (data) => {
+      const h = add("dailyHelp", {
+        ...data, flats: [me.flat], cardCode: code6(), verified: true,
+        rating: 5, status: "out", lastIn: null, photo: null,
+      });
+      logAudit("help.add", h.name, `${h.role} for ${me.flat}`);
+      return h;
+    };
+
+    const updateHelp = (id, body) => patch("dailyHelp", id, body);
+
+    const removeHelp = (id) => { remove("dailyHelp", id); say("Removed from your flat"); };
+
+    const rateHelp = (id, stars) => { patch("dailyHelp", id, { rating: stars }); say("Rating saved"); };
+
     const addAmenity = (data) => add("amenities", { ...data, active: true });
 
     const addClass = (data) => add("classes", { ...data, enrolled: 0 });
@@ -318,6 +333,7 @@ export function useActions() {
       postNotice, react, markRead, vote, createPoll, book,
       createPost, likePost, replyToPost, removePost,
       decideBooking, addAmenity, addClass, enrol, addVehicle, removeVehicle,
+      addHelp, updateHelp, removeHelp, rateHelp,
       computeBill, generateBills, approveRun, rejectRun, payBill, addLedger, reconcile,
       approveRegistration, rejectRegistration,
       cycles: { current: thisCycle(), next: shiftCycle(thisCycle(), 1) },

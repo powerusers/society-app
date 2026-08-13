@@ -54,6 +54,10 @@ export const POST_TYPES = ["discussion", "recommendation", "classified"];
 
 export const VEHICLE_KINDS = ["Car", "Bike", "EV"];
 
+export const HELP_ROLES = [
+  "Maid", "Cook", "Driver", "Nanny", "Dog walker", "Newspaper", "Milkman", "Tutor", "Physiotherapist",
+];
+
 /**
  * Registration numbers, compared the way a gate does.
  *

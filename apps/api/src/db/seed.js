@@ -264,6 +264,52 @@ export async function seed({ silent = false } = {}) {
     }
     await c.query("SELECT setval('ticket_ref_seq', 2045)");
 
+    /* ---- daily help, the flats they work at, and a week of attendance ---- */
+    const helpRoles = ["Maid", "Cook", "Driver", "Nanny", "Dog walker", "Newspaper", "Milkman", "Tutor"];
+    const helpIds = [];
+    for (let i = 0; i < 22; i++) {
+      /* The first three work at the demo flat, so the resident's screen has
+         something in it; the rest are spread across the society. */
+      const worksAt = i === 0 ? ["A-401", "A-402"] : i === 1 ? ["A-401"] : i === 2 ? ["A-401", "B-201"]
+        : Array.from({ length: int(1, 3) }, () => pick(flats).code).filter((v, j, a) => a.indexOf(v) === j);
+      const { rows: [row] } = await c.query(
+        `INSERT INTO daily_help (society_id, name, role, phone, card_code, biometric, police_verified)
+         VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id`,
+        [society.id, personName(), i < 3 ? ["Maid", "Cook", "Driver"][i] : pick(helpRoles),
+          phone(), `H${String(i + 101).padStart(5, "0")}`, chance(0.7), chance(0.6)],
+      );
+      helpIds.push({ id: row.id, flats: worksAt, inside: chance(0.4) });
+      for (const code of worksAt) {
+        await c.query("INSERT INTO daily_help_flats (help_id, flat_id) VALUES ($1,$2) ON CONFLICT DO NOTHING",
+          [row.id, flatByCode.get(code).id]);
+      }
+      /* Ratings from the households they work for, so the average is an
+         average of opinions rather than one number. */
+      for (const code of worksAt) {
+        if (chance(0.6)) {
+          await c.query("INSERT INTO help_ratings (help_id, flat_id, stars) VALUES ($1,$2,$3) ON CONFLICT DO NOTHING",
+            [row.id, flatByCode.get(code).id, int(3, 5)]);
+        }
+      }
+    }
+
+    for (const h of helpIds) {
+      for (let d = 6; d >= 0; d--) {
+        if (!chance(0.85)) continue;
+        const inAt = new Date(Date.now() - d * 864e5);
+        inAt.setHours(int(7, 10), int(0, 59), 0, 0);
+        /* Today's visit is left open for the few who are inside now — that is
+           what "inside" means here, rather than a status column. */
+        const stillIn = d === 0 && h.inside;
+        const outAt = stillIn ? null : new Date(inAt.getTime() + int(45, 200) * 60e3);
+        await c.query(
+          `INSERT INTO help_attendance (society_id, help_id, in_at, out_at, mode, gate_id)
+           VALUES ($1,$2,$3,$4,$5,$6)`,
+          [society.id, h.id, inAt, outAt, chance(0.7) ? "biometric" : "qr", pick(gates).id],
+        );
+      }
+    }
+
     /* ---- registered vehicles, with their allotted slots ---- */
     for (const [who, flatCode, kind, model, number, slot, sticker] of [
       [rahul.id, "A-401", "Car", "Hyundai Creta", "MH12AB1234", "P1-42", 421],

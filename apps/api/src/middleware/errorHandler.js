@@ -14,6 +14,10 @@ function fromPgError(err) {
          does not exist. */
       if (err.constraint === "amenity_slot_once") return new AppError(409, "conflict", "That slot has just been booked by another resident");
       if (err.constraint === "vehicle_slot_once") return new AppError(409, "conflict", "That parking slot is already allotted to another vehicle");
+      /* Reached when two desks check the same person in at once — the one that
+         loses should read like the ordinary "already inside", not like a
+         database mishap. */
+      if (err.constraint === "help_open_attendance_once") return new AppError(409, "conflict", "They have already been checked in");
       if (err.constraint === "vehicles_society_id_number_key") return new AppError(409, "conflict", "That registration number is already on the society's register");
       return new AppError(409, "conflict", "That record already exists");
     case "23514": // check_violation

@@ -175,7 +175,8 @@ export function HelpRow({ h, right, onClick }) {
             {h.status === "in" ? `In since ${fmtTime(h.lastIn)}` : "Outside"}
           </Badge>
           {h.policeVerified && <Badge>Police verified</Badge>}
-          <span className="tiny">{h.rating} ★</span>
+          {/* Nobody has rated them yet is a fact worth stating; "null ★" is not. */}
+          <span className="tiny">{h.rating ? `${h.rating} ★` : "Not rated"}</span>
         </div>
       </div>
       {right}

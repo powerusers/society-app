@@ -17,6 +17,7 @@ import { pollsRouter } from "./routes/polls.js";
 import { postsRouter } from "./routes/posts.js";
 import { amenitiesRouter } from "./routes/amenities.js";
 import { vehiclesRouter } from "./routes/vehicles.js";
+import { helpRouter } from "./routes/help.js";
 import { documentsRouter } from "./routes/documents.js";
 import { errorHandler, notFoundHandler } from "./middleware/errorHandler.js";
 import { pool } from "./db/pool.js";
@@ -77,6 +78,7 @@ export function createApp() {
   app.use("/api/posts", postsRouter);
   app.use("/api/amenities", amenitiesRouter);
   app.use("/api/vehicles", vehiclesRouter);
+  app.use("/api/help", helpRouter);
   app.use("/api/documents", documentsRouter);
 
   app.use(notFoundHandler);

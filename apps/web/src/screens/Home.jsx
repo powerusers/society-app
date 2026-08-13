@@ -9,6 +9,7 @@ import { useMyBills } from "../data/bills";
 import { useNotices } from "../data/notices";
 import { usePolls } from "../data/polls";
 import { useAmenities } from "../data/amenities";
+import { useHelp } from "../data/help";
 import { inr, lakh, cycleLabel, fmtDate, pct, thisCycle, fmtTime } from "../lib/format";
 
 export default function Home({ nav }) {
@@ -18,13 +19,13 @@ export default function Home({ nav }) {
   const { notices } = useNotices();
   const { openForMe: openPoll, vote } = usePolls();
   const { mine: bookings } = useAmenities();
+  const { mine: help } = useHelp();
   const [sheet, setSheet] = useState(null);
 
   const flat = me.flat;
   const dueBill = bills.find((b) => b.status !== "paid");
   const pending = visitors.filter((v) => v.status === "pending" && v.flatCode === flat);
   const inside = visitors.filter((v) => v.status === "inside" && v.flatCode === flat);
-  const help = sel.helpOf(flat);
   const helpIn = help.filter((h) => h.status === "in");
   const myTickets = db.tickets.filter((t) => t.flatCode === flat && t.status !== "closed");
   const myBookings = bookings.filter((b) => b.status !== "cancelled" && b.date >= new Date().toISOString().slice(0, 10));

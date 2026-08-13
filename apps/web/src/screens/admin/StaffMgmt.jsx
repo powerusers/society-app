@@ -3,10 +3,12 @@ import Icons from "../../icons";
 import { Badge, Btn, Empty, Sheet, Segmented, Stat, Avatar, Input, Select, Alert } from "../../components/ui";
 import { HelpRow } from "../../components/entities";
 import { useApp } from "../../store";
+import { useHelp } from "../../data/help";
 import { fmtDate, dayKey, uid, iso, code6 } from "../../lib/format";
 
 export default function StaffMgmt() {
   const { db, sel, add, patch, say, logAudit } = useApp();
+  const { help, update: updateHelp } = useHelp();
   const [tab, setTab] = useState("society");
   const [sheet, setSheet] = useState(false);
 
@@ -19,8 +21,8 @@ export default function StaffMgmt() {
     <>
       <div className="grid3">
         <Stat value={society.length} label="On payroll" color="var(--brand)" />
-        <Stat value={db.dailyHelp.length} label="Daily help" color="var(--blue)" />
-        <Stat value={db.dailyHelp.filter((h) => h.policeVerified).length} label="Police verified" color="var(--green)" />
+        <Stat value={help.length} label="Daily help" color="var(--blue)" />
+        <Stat value={help.filter((h) => h.policeVerified).length} label="Police verified" color="var(--green)" />
       </div>
 
       <div style={{ marginTop: 12 }}>
@@ -62,15 +64,19 @@ export default function StaffMgmt() {
 
       {tab === "help" && (
         <div className="list">
-          {db.dailyHelp.map((h) => (
+          {help.map((h) => (
             <HelpRow key={h.id} h={h} right={
-              <button className="x" onClick={() => { patch("dailyHelp", h.id, { policeVerified: !h.policeVerified }); say(h.policeVerified ? "Marked unverified" : "Marked police verified"); }}
-                aria-label="Toggle verification" style={h.policeVerified ? { background: "var(--green-bg)", color: "var(--green)" } : undefined}>
+              <button className="x" aria-label="Toggle verification"
+                onClick={async () => {
+                  const res = await updateHelp(h, { policeVerified: !h.policeVerified });
+                  if (res.ok) say(h.policeVerified ? "Marked unverified" : "Marked police verified");
+                }}
+                style={h.policeVerified ? { background: "var(--green-bg)", color: "var(--green)" } : undefined}>
                 <Icons.Shield size={15} />
               </button>
             } />
           ))}
-          {!db.dailyHelp.length && <Empty icon={Icons.Users} title="No daily help registered" />}
+          {!help.length && <Empty icon={Icons.Users} title="No daily help registered" />}
         </div>
       )}
 

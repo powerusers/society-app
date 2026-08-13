@@ -2,7 +2,7 @@ import { z } from "zod";
 import {
   VISITOR_CATEGORIES, VISITOR_STATUSES, TICKET_CATEGORIES, TICKET_PRIORITIES,
   TICKET_STATUSES, TICKET_SOURCES, PAYMENT_MODES, RELATIONS,
-  INCIDENT_TYPES, SEVERITIES, NOTICE_KINDS, POST_TYPES, VEHICLE_KINDS, normalisePlate,
+  INCIDENT_TYPES, SEVERITIES, NOTICE_KINDS, POST_TYPES, VEHICLE_KINDS, HELP_ROLES, normalisePlate,
 } from "./entities.js";
 import {
   DOCUMENT_CATEGORIES, DOCUMENT_VISIBILITY, MAX_DOCUMENT_BYTES, isAllowedContentType,
@@ -136,6 +136,37 @@ export const createPostSchema = z.object({
 
 export const postCommentSchema = z.object({
   text: z.string().trim().min(1, "Write something first").max(2000),
+});
+
+export const createHelpSchema = z.object({
+  name: z.string().trim().min(2, "Enter a name").max(120),
+  /* Not an enum: societies employ people the list did not think of, and
+     refusing "Gardener" because it is not on a dropdown helps nobody. */
+  role: z.string().trim().min(2).max(40).default("Maid"),
+  phone: phone.optional().or(z.literal("")),
+  biometric: z.boolean().default(false),
+  policeVerified: z.boolean().default(false),
+  /* Only someone who can manage staff sends this; a resident's help goes
+     against the flat they live in. */
+  flatCode: flatCode.optional(),
+});
+
+export const updateHelpSchema = z.object({
+  name: z.string().trim().min(2).max(120).optional(),
+  role: z.string().trim().min(2).max(40).optional(),
+  phone: phone.optional().or(z.literal("")),
+  biometric: z.boolean().optional(),
+  policeVerified: z.boolean().optional(),
+}).refine((v) => Object.keys(v).length > 0, { message: "Nothing to change" });
+
+export const rateHelpSchema = z.object({
+  stars: z.coerce.number().int().min(1).max(5),
+});
+
+export const checkHelpSchema = z.object({
+  direction: z.enum(["in", "out"]),
+  mode: z.enum(["qr", "biometric", "manual"]).default("manual"),
+  gateId: z.string().uuid().nullish(),
 });
 
 export const createVehicleSchema = z.object({
