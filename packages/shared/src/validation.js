@@ -2,7 +2,7 @@ import { z } from "zod";
 import {
   VISITOR_CATEGORIES, VISITOR_STATUSES, TICKET_CATEGORIES, TICKET_PRIORITIES,
   TICKET_STATUSES, TICKET_SOURCES, PAYMENT_MODES, RELATIONS,
-  INCIDENT_TYPES, SEVERITIES, NOTICE_KINDS, POST_TYPES,
+  INCIDENT_TYPES, SEVERITIES, NOTICE_KINDS, POST_TYPES, VEHICLE_KINDS, normalisePlate,
 } from "./entities.js";
 import {
   DOCUMENT_CATEGORIES, DOCUMENT_VISIBILITY, MAX_DOCUMENT_BYTES, isAllowedContentType,
@@ -137,6 +137,26 @@ export const createPostSchema = z.object({
 export const postCommentSchema = z.object({
   text: z.string().trim().min(1, "Write something first").max(2000),
 });
+
+export const createVehicleSchema = z.object({
+  kind: z.enum(VEHICLE_KINDS).default("Car"),
+  model: z.string().trim().min(2, "Which make and model?").max(80),
+  /* Checked against the normalised form, so punctuation the resident typed is
+     not the difference between a valid plate and a rejected one. Deliberately
+     loose on the shape: BH-series, older state formats and armed-forces plates
+     all differ, and the society's register is the authority on whose car it is. */
+  number: z.string().trim().refine((v) => normalisePlate(v).length >= 6 && normalisePlate(v).length <= 12,
+    "That does not look like a registration number"),
+  slot: z.string().trim().max(20).optional().default(""),
+  /* Only the committee sends this, to register a vehicle for a flat that is not
+     their own; a resident's vehicle goes against the flat they live in. */
+  flatCode: flatCode.optional(),
+});
+
+export const updateVehicleSchema = z.object({
+  model: z.string().trim().min(2).max(80).optional(),
+  slot: z.string().trim().max(20).optional(),
+}).refine((v) => Object.keys(v).length > 0, { message: "Nothing to change" });
 
 export const createAmenitySchema = z.object({
   name: z.string().trim().min(2, "Name the amenity").max(80),

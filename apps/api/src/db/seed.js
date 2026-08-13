@@ -264,6 +264,19 @@ export async function seed({ silent = false } = {}) {
     }
     await c.query("SELECT setval('ticket_ref_seq', 2045)");
 
+    /* ---- registered vehicles, with their allotted slots ---- */
+    for (const [who, flatCode, kind, model, number, slot, sticker] of [
+      [rahul.id, "A-401", "Car", "Hyundai Creta", "MH12AB1234", "P1-42", 421],
+      [rahul.id, "A-401", "Bike", "Honda Activa", "MH12CD5678", "B-15", 422],
+      [treasurer.id, "B-201", "EV", "Tata Nexon EV", "MH12EF9012", "P1-08", 311],
+    ]) {
+      await c.query(
+        `INSERT INTO vehicles (society_id, flat_id, owner_id, kind, model, number, slot, sticker_no)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
+        [society.id, flatByCode.get(flatCode).id, who, kind, model, number, slot, sticker],
+      );
+    }
+
     /* ---- amenities, the classes in them, and a diary with a clash to see ---- */
     const amenityIds = {};
     for (const [name, emoji, capacity, charge, deposit, slots, rules, approval] of [

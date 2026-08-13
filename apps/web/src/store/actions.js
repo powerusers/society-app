@@ -185,6 +185,17 @@ export function useActions() {
 
     const decideBooking = (id, status) => patch("bookings", id, { status, decidedAt: iso(), decidedBy: me.id });
 
+    const addVehicle = (data) => {
+      const v = add("vehicles", {
+        ...data, ownerId: me.id, flatCode: me.flat,
+        sticker: String(db.vehicles.length + 501).padStart(4, "0"),
+      });
+      logAudit("vehicle.add", v.number, `${v.kind} · ${me.flat}`);
+      return v;
+    };
+
+    const removeVehicle = (id) => { remove("vehicles", id); say("Vehicle removed"); };
+
     const addAmenity = (data) => add("amenities", { ...data, active: true });
 
     const addClass = (data) => add("classes", { ...data, enrolled: 0 });
@@ -306,7 +317,7 @@ export function useActions() {
       raiseTicket, commentTicket, setTicketStatus, slaFor,
       postNotice, react, markRead, vote, createPoll, book,
       createPost, likePost, replyToPost, removePost,
-      decideBooking, addAmenity, addClass, enrol,
+      decideBooking, addAmenity, addClass, enrol, addVehicle, removeVehicle,
       computeBill, generateBills, approveRun, rejectRun, payBill, addLedger, reconcile,
       approveRegistration, rejectRegistration,
       cycles: { current: thisCycle(), next: shiftCycle(thisCycle(), 1) },
