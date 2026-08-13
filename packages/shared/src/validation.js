@@ -85,6 +85,36 @@ export const setRoleSchema = z.object({
   designation: z.string().trim().max(60).nullish(),
 });
 
+/**
+ * A staff or guard login the committee creates.
+ *
+ * Deliberately narrow: this mints an account that can act inside the society,
+ * so it can only ever produce a guard or facility staff member. Residents come
+ * through registration and approval, and committee membership is a role change
+ * on an account that already exists.
+ */
+export const createStaffSchema = z.object({
+  name: z.string().trim().min(2, "Enter a name").max(120),
+  role: z.enum(["guard", "staff"], { errorMap: () => ({ message: "Guards and facility staff only" }) }),
+  designation: z.string().trim().max(60).optional().default(""),
+  phone: phone.optional().or(z.literal("")),
+  /* Optional because many guards have no work email. Left blank, the API mints
+     a sign-in identifier from the name and the society; it is a login, not a
+     mailbox, and the screen says so. */
+  email: z.string().email("That does not look like an email address").optional().or(z.literal("")),
+  gateId: z.string().uuid().nullish(),
+  shift: z.string().trim().max(40).optional().default(""),
+});
+
+/** What a committee may change about a staff account afterwards. */
+export const updateStaffSchema = z.object({
+  name: z.string().trim().min(2).max(120).optional(),
+  designation: z.string().trim().max(60).nullish(),
+  phone: phone.optional().or(z.literal("")),
+  gateId: z.string().uuid().nullish(),
+  shift: z.string().trim().max(40).nullish(),
+}).refine((v) => Object.keys(v).length > 0, { message: "Nothing to change" });
+
 export const createNoticeSchema = z.object({
   kind: z.enum(NOTICE_KINDS).default("notice"),
   title: z.string().trim().min(3, "Give the notice a title").max(160),
