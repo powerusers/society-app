@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The same courtyard mark the app draws in Compose, as a vector so there are no
+  bitmaps to keep in step at five densities. Adaptive icons only need this and a
+  background colour on API 26+, which is our minimum.
+
+  The 108dp canvas is the adaptive-icon standard; the mark sits inside the
+  middle 72dp so the launcher can mask it into any shape without clipping.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Left tower -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M31,45 h13 a3,3 0 0 1 3,3 v25 a3,3 0 0 1 -3,3 h-13 a3,3 0 0 1 -3,-3 v-25 a3,3 0 0 1 3,-3 z" />
+    <!-- Right tower -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M64,45 h13 a3,3 0 0 1 3,3 v25 a3,3 0 0 1 -3,3 h-13 a3,3 0 0 1 -3,-3 v-25 a3,3 0 0 1 3,-3 z" />
+    <!-- The courtyard wall between them, lower and quieter -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:fillAlpha="0.55"
+        android:pathData="M47,63 h14 v10 a3,3 0 0 1 -3,3 h-8 a3,3 0 0 1 -3,-3 z" />
+    <!-- Roofline over the opening -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M44,49 L54,37 L64,49 z" />
+</vector>
