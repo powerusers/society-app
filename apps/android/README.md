@@ -59,23 +59,34 @@ rule, and this is not a browser.
 The application ID is `com.prangan.society`. **Fix it before the first upload** —
 Play ties an app to its ID permanently, and it cannot be changed afterwards.
 
-## Checking the contract without the Android SDK
+## What can be checked without the Android SDK
 
-The Compose UI needs the SDK to compile. The models, the Retrofit interface and
-the error handling do not — and they are the layer most likely to be silently
-wrong, because a field the API renamed is a crash on a resident's phone that
-reading the code does not catch.
+Compose needs the SDK, and `androidx` is published only to Google's Maven. But
+the two pieces most likely to be silently wrong need neither, and both are
+checked by running them:
 
 ```bash
 apps/android/tools/contract-check.sh http://127.0.0.1:4210 someone@society.in their-password
 ```
 
-It compiles those files with the Kotlin compiler pulled from Maven Central,
-then signs in against a running API and checks that what comes back actually
-fits the declared types — including the refresh-token rotation the interceptor
-depends on. Nothing from Google is needed, so it runs anywhere a JDK does.
+**Token renewal**, against a mock server with real threads. The API's refresh
+tokens are single-use, so six requests failing with 401 at the same instant must
+spend one refresh between them — spend six and five are rejected against an
+already-consumed token, and the resident is signed out mid-use. That is a
+concurrency bug, and reading the code is not how concurrency bugs are found.
+This is why `AuthInterceptor` depends on the `TokenStore` interface rather than
+on DataStore directly: the inversion is what makes it runnable off a device.
 
-Worth running after any change to the API's serializers.
+**The API contract**, against a live server. Whether the JSON the API actually
+sends fits the Kotlin types the app declares — a renamed field or an unexpected
+null is a crash on a phone that no amount of re-reading catches.
+
+Both pull the Kotlin compiler and dependencies from Maven Central. Nothing from
+Google, so it runs anywhere a JDK does. Worth running after any change to the
+API's serializers.
+
+Everything else — the Compose screens, the theme, the DataStore-backed session —
+can only be compiled where the Android SDK is.
 
 ## Shape of the code
 

@@ -56,7 +56,7 @@ class AppViewModel(
         viewModelScope.launch {
             /* A stored refresh token is a claim, not proof. The only way to know
                whether the session survived is to ask the server. */
-            if (session.refreshToken() == null) {
+            if (session.refreshTokenAsync() == null) {
                 _state.update { it.copy(loading = false, signedIn = false) }
             } else {
                 loadSession()
@@ -110,7 +110,7 @@ class AppViewModel(
                 /* Whatever was stored is no longer a session. Say so by showing
                    the sign-in screen rather than an empty app that keeps
                    failing. */
-                session.clear()
+                session.clearAsync()
                 _state.value = AppState(loading = false, signedIn = false)
             }
     }

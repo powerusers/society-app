@@ -53,7 +53,19 @@ fun main(args: Array<String>) = runBlocking {
     }
 
     // Sign in: the response has to fit SessionResponse, including the nested user.
-    val session = api.login(LoginRequest(email, password))
+    val session = try {
+        api.login(LoginRequest(email, password))
+    } catch (e: java.io.IOException) {
+        /* Much the commonest way to run this wrong is against an API that is not
+           up. A stack trace buries that; say it instead. */
+        println("Could not reach the API at $base — is it running?")
+        println("  ${e.message}")
+        kotlin.system.exitProcess(2)
+    } catch (e: retrofit2.HttpException) {
+        println("The API refused the sign-in for $email (HTTP ${e.code()}).")
+        println("  Pass a working email and password: contract-check.sh <url> <email> <password>")
+        kotlin.system.exitProcess(2)
+    }
     token = session.accessToken
     check("login deserialises into SessionResponse", session.accessToken.isNotBlank())
     check("and carries a user with a role", session.user.role.isNotBlank(), session.user.role)

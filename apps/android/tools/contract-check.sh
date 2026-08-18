@@ -51,16 +51,27 @@ fetch "com/squareup/retrofit2/retrofit/2.11.0/retrofit-2.11.0.jar"
 fetch "com/squareup/okhttp3/okhttp/4.12.0/okhttp-4.12.0.jar"
 fetch "com/squareup/okio/okio-jvm/3.6.0/okio-jvm-3.6.0.jar"
 fetch "com/jakewharton/retrofit/retrofit2-kotlinx-serialization-converter/1.0.0/retrofit2-kotlinx-serialization-converter-1.0.0.jar"
+fetch "com/squareup/okhttp3/mockwebserver/4.12.0/mockwebserver-4.12.0.jar"
+fetch "junit/junit/4.13.2/junit-4.13.2.jar"
+fetch "org/hamcrest/hamcrest-core/1.3/hamcrest-core-1.3.jar"
 
 CP=$(ls "$CACHE"/jars/*.jar | tr '\n' ':')
 COMPILER="$CACHE/jars/kotlin-compiler-embeddable-$KOTLIN.jar:$CACHE/jars/kotlin-stdlib-$KOTLIN.jar:$CACHE/jars/kotlin-daemon-embeddable-$KOTLIN.jar:$CACHE/jars/kotlin-script-runtime-$KOTLIN.jar:$CACHE/jars/trove4j-1.0.20200330.jar:$CACHE/jars/annotations-23.0.0.jar:$CACHE/jars/kotlinx-coroutines-core-jvm-1.8.1.jar"
 
-echo "compiling the contract layer:"
+echo "compiling:"
 java -cp "$COMPILER" org.jetbrains.kotlin.cli.jvm.K2JVMCompiler \
   -no-stdlib -no-reflect -nowarn -classpath "$CP" -d "$OUT" \
   -Xplugin="$CACHE/jars/kotlin-serialization-compiler-plugin-embeddable-$KOTLIN.jar" \
   "$SRC/core/model/Models.kt" "$SRC/core/net/Api.kt" "$SRC/core/net/ApiError.kt" \
-  "$HERE/ContractCheck.kt" 2>&1 | grep -vE "^(warning:|info:)" || true
+  "$SRC/core/net/TokenStore.kt" "$SRC/core/net/AuthInterceptor.kt" \
+  "$HERE/ContractCheck.kt" "$HERE/AuthRenewalTest.kt" 2>&1 | grep -vE "^(warning:|info:)" || true
 
-echo "running against ${1:-http://127.0.0.1:4210}:"
+# Token renewal first: it needs no server of its own, and if the concurrency is
+# wrong there is little point asking whether the JSON parses.
+echo
+echo "token renewal (against a mock server, with real threads):"
+java -cp "$OUT:$CP" harness.AuthRenewalTestKt
+
+echo
+echo "API contract (against ${1:-http://127.0.0.1:4210}):"
 java -cp "$OUT:$CP" harness.ContractCheckKt "$@"

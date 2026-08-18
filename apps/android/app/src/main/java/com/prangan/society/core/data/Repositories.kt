@@ -24,7 +24,7 @@ class SocietyRepository(private val network: Network) {
 
     suspend fun signIn(email: String, password: String): Result<User> =
         apiCall { api.login(LoginRequest(email.trim(), password)) }
-            .onSuccess { network.session.save(it.accessToken, it.refreshToken) }
+            .onSuccess { network.session.saveAsync(it.accessToken, it.refreshToken) }
             .map { it.user }
 
     /**
@@ -32,10 +32,10 @@ class SocietyRepository(private val network: Network) {
      * session rather than staying valid on a handset that was sold.
      */
     suspend fun signOut() {
-        network.session.refreshToken()?.let { token ->
+        network.session.refreshTokenAsync()?.let { token ->
             apiCall { api.logout(RefreshRequest(token)) }
         }
-        network.session.clear()
+        network.session.clearAsync()
     }
 
     suspend fun me(): Result<MeResponse> = apiCall { api.me() }

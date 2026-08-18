@@ -43,7 +43,7 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
 
         val session = Session(applicationContext)
-        val network = Network(applicationContext, session)
+        val network = Network(session)
         val repo = SocietyRepository(network)
 
         setContent {

@@ -15,15 +15,19 @@ private val Context.sessionStore by preferencesDataStore(name = "prangan_session
  * Where the tokens live between launches.
  *
  * The access token is short-lived and the refresh token is single-use — the API
- * rotates it on every refresh — so what is kept here is worth no more than one
+ * rotates it on every renewal — so what is kept here is worth no more than one
  * exchange. That is deliberate: an app that stored a long-lived credential on
  * the device would be handing over the account with the handset.
  *
- * DataStore, not EncryptedSharedPreferences: on a device with a lock screen the
- * app's own storage is already encrypted at rest, and the deprecated crypto
- * library buys little at the cost of a dependency that has to keep working.
+ * DataStore rather than EncryptedSharedPreferences: on a device with a lock
+ * screen the app's own storage is already encrypted at rest, and the deprecated
+ * crypto library buys little for a dependency that has to keep working.
+ *
+ * The blocking half of `TokenStore` is what OkHttp's interceptors need — they
+ * are synchronous and never run on the main thread, so blocking there is
+ * correct rather than merely convenient.
  */
-class Session(private val context: Context) {
+class Session(private val context: Context) : TokenStore {
 
     private object Keys {
         val ACCESS = stringPreferencesKey("access_token")
@@ -32,31 +36,26 @@ class Session(private val context: Context) {
 
     val signedIn: Flow<Boolean> = context.sessionStore.data.map { it[Keys.REFRESH] != null }
 
-    suspend fun save(access: String, refresh: String) {
+    suspend fun accessTokenAsync(): String? = context.sessionStore.data.first()[Keys.ACCESS]
+
+    suspend fun refreshTokenAsync(): String? = context.sessionStore.data.first()[Keys.REFRESH]
+
+    suspend fun saveAsync(access: String, refresh: String) {
         context.sessionStore.edit {
             it[Keys.ACCESS] = access
             it[Keys.REFRESH] = refresh
         }
     }
 
-    suspend fun clear() {
+    suspend fun clearAsync() {
         context.sessionStore.edit { it.clear() }
     }
 
-    suspend fun accessToken(): String? = context.sessionStore.data.first()[Keys.ACCESS]
+    override fun accessToken(): String? = runBlocking { accessTokenAsync() }
 
-    suspend fun refreshToken(): String? = context.sessionStore.data.first()[Keys.REFRESH]
+    override fun refreshToken(): String? = runBlocking { refreshTokenAsync() }
 
-    /*
-     * OkHttp interceptors are synchronous, and they run on a background thread
-     * that is never the main thread, so blocking here is correct rather than
-     * merely convenient.
-     */
-    fun accessTokenBlocking(): String? = runBlocking { accessToken() }
+    override fun save(access: String, refresh: String) = runBlocking { saveAsync(access, refresh) }
 
-    fun refreshTokenBlocking(): String? = runBlocking { refreshToken() }
-
-    fun saveBlocking(access: String, refresh: String) = runBlocking { save(access, refresh) }
-
-    fun clearBlocking() = runBlocking { clear() }
+    override fun clear() = runBlocking { clearAsync() }
 }
