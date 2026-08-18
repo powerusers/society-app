@@ -59,6 +59,24 @@ rule, and this is not a browser.
 The application ID is `com.prangan.society`. **Fix it before the first upload** —
 Play ties an app to its ID permanently, and it cannot be changed afterwards.
 
+## Checking the contract without the Android SDK
+
+The Compose UI needs the SDK to compile. The models, the Retrofit interface and
+the error handling do not — and they are the layer most likely to be silently
+wrong, because a field the API renamed is a crash on a resident's phone that
+reading the code does not catch.
+
+```bash
+apps/android/tools/contract-check.sh http://127.0.0.1:4210 someone@society.in their-password
+```
+
+It compiles those files with the Kotlin compiler pulled from Maven Central,
+then signs in against a running API and checks that what comes back actually
+fits the declared types — including the refresh-token rotation the interceptor
+depends on. Nothing from Google is needed, so it runs anywhere a JDK does.
+
+Worth running after any change to the API's serializers.
+
 ## Shape of the code
 
 ```
