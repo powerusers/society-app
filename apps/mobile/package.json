@@ -1,0 +1,41 @@
+{
+  "name": "@gvs/mobile",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "android": "react-native run-android",
+    "apk": "cd android && ./gradlew assembleRelease",
+    "bundle": "cd android && ./gradlew bundleRelease",
+    "icons": "node scripts/icons.mjs",
+    "start": "react-native start"
+  },
+  "dependencies": {
+    "@gvs/shared": "*",
+    "@react-native-async-storage/async-storage": "2.2.0",
+    "@react-native-documents/picker": "12.0.2",
+    "@react-native-firebase/app": "22.4.0",
+    "@react-native-firebase/messaging": "22.4.0",
+    "@react-navigation/bottom-tabs": "^7.3.10",
+    "@react-navigation/native": "^7.1.6",
+    "@react-navigation/native-stack": "^7.3.10",
+    "react": "19.1.4",
+    "react-native": "0.81.6",
+    "react-native-qrcode-svg": "^6.3.15",
+    "react-native-safe-area-context": "5.9.1",
+    "react-native-screens": "4.16.0",
+    "react-native-svg": "15.15.5",
+    "react-native-vision-camera": "4.7.2"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.25.2",
+    "@babel/preset-env": "^7.25.3",
+    "@babel/runtime": "^7.25.0",
+    "@react-native-community/cli": "20.0.0",
+    "@react-native-community/cli-platform-android": "20.0.0",
+    "@react-native/babel-preset": "0.81.6",
+    "@react-native/metro-config": "0.81.6"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

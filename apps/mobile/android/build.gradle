@@ -1,0 +1,32 @@
+buildscript {
+    ext {
+        buildToolsVersion = "36.0.0"
+        minSdkVersion = 24
+        compileSdkVersion = 36
+        targetSdkVersion = 36
+        /* The template asks for 27.1.12297006. That version exists in this SDK
+           as an empty directory from an interrupted install — no
+           source.properties — and AGP fails configuration rather than skipping
+           it. 27.0.12077973 is complete and present. React Native links against
+           the prebuilt .so files shipped in the react-android AAR, so the NDK
+           here only has to satisfy AGP, not compile the engine. Reinstall
+           27.1.12297006 through the SDK manager and this can go back. */
+        ndkVersion = "27.0.12077973"
+        kotlinVersion = "2.1.20"
+    }
+    repositories {
+        google()
+        mavenCentral()
+    }
+    dependencies {
+        classpath("com.android.tools.build:gradle")
+        classpath("com.facebook.react:react-native-gradle-plugin")
+        classpath("org.jetbrains.kotlin:kotlin-gradle-plugin")
+        /* Reads google-services.json into Android resources. Declared here
+           unconditionally — it is only ever applied in app/build.gradle, and
+           only when that file actually exists. */
+        classpath("com.google.gms:google-services:4.4.2")
+    }
+}
+
+apply plugin: "com.facebook.react.rootproject"

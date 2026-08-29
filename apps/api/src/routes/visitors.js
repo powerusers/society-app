@@ -1,7 +1,7 @@
 import { Router } from "express";
 import {
   can, canActOnFlat, isFlatMember, canTransitionVisitor, createVisitorSchema, transitionVisitorSchema,
-  verifyPassSchema, listQuerySchema,
+  verifyPassSchema, listQuerySchema, catLabel,
 } from "@gvs/shared";
 import { many, one, tx } from "../db/pool.js";
 import { requireAuth, requireCap } from "../middleware/auth.js";
@@ -9,6 +9,7 @@ import { validate, validateQuery } from "../middleware/validate.js";
 import { audit, auditCtx } from "../lib/audit.js";
 import { visitor as toVisitor } from "../lib/serialize.js";
 import { badRequest, conflict, forbidden, notFound, wrap } from "../lib/errors.js";
+import { sendToUsers, usersInFlat } from "../lib/push.js";
 
 export const visitorsRouter = Router();
 visitorsRouter.use(requireAuth);
@@ -164,8 +165,89 @@ visitorsRouter.patch("/:id/status", validate(transitionVisitorSchema), wrap(asyn
   });
 
   const full = await one(`${SELECT} WHERE v.id = $1`, [updated.id]);
+
+  /* Notify after the transaction commits, never inside it. A push that is slow
+     — and FCM sometimes is — would otherwise hold a row lock on the gate's
+     busiest table, and a push that fails must not roll back an approval that
+     legitimately happened.
+     
+     Wrapped because the transition is already committed by this point: the
+     recipient lookup is a database query of its own, and letting it throw would
+     turn a successful approval into a 500 the guard would then retry against a
+     visitor who has already been let in. */
+  try {
+    await notify(req, current, full, next);
+  } catch (err) {
+    console.error("[push] notify failed:", err.message);
+  }
+
   res.json({ visitor: toVisitor(full) });
 }));
+
+/**
+ * Who needs to hear about this move, and what it should say.
+ *
+ * Only two transitions are worth a notification. A gate request is the one thing
+ * here that is worthless late — a guard is standing at the gate while the flat
+ * decides — and the guard needs the answer for the same reason. The rest of the
+ * lifecycle is visible on a screen the person is already looking at, and a
+ * notification for every step is how people learn to swipe them all away.
+ */
+async function notify(req, current, full, next) {
+  if (next === "pending") {
+    const residents = await usersInFlat(req.user.society_id, current.flat_id);
+    /* The guard who sent it does not need telling; they just pressed the button.
+       They would be in this list if a committee member with a flat were on gate
+       duty. */
+    const recipients = residents.filter((id) => id !== req.user.id);
+
+    const where = full.gate_name ? ` at ${full.gate_name}` : "";
+    return sendToUsers(recipients, {
+      title: `${catLabel(current.category)} at the gate`,
+      body: `${current.name} is waiting${where} for Flat ${current.flat_code}.`,
+      channelId: "gate",
+      pref: "gate",
+      /* Data-only, so the device's own messaging service handles it and can
+         attach the full-screen intent that wakes a locked phone. See the note in
+         lib/push.js. */
+      dataOnly: true,
+      /* The payload the app needs to raise its own approval prompt without
+         first going back to the server for the visitor it was just told about. */
+      data: {
+        type: "visitor.approval",
+        visitorId: current.id,
+        name: current.name,
+        category: current.category,
+        flatCode: current.flat_code,
+        purpose: current.purpose || "",
+        gateName: full.gate_name || "",
+        phone: current.phone || "",
+        vehicle: current.vehicle || "",
+      },
+    });
+  }
+
+  if ((next === "approved" || next === "denied") && current.created_by && current.created_by !== req.user.id) {
+    const approved = next === "approved";
+    return sendToUsers([current.created_by], {
+      title: approved ? "Entry approved" : "Entry denied",
+      body: approved
+        ? `Flat ${current.flat_code} approved ${current.name}.`
+        : `Flat ${current.flat_code} denied ${current.name}.`,
+      channelId: "gate",
+      pref: "gate",
+      data: {
+        type: "visitor.decision",
+        visitorId: current.id,
+        status: next,
+        name: current.name,
+        flatCode: current.flat_code,
+      },
+    });
+  }
+
+  return undefined;
+}
 
 /** Gate device scanning a QR pass. Returns the visitor without admitting them. */
 visitorsRouter.post("/verify-pass", requireCap("gate.operate"), validate(verifyPassSchema), wrap(async (req, res) => {

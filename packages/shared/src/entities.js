@@ -3,6 +3,24 @@
 export const VISITOR_CATEGORIES = ["delivery", "guest", "service", "cab", "staff"];
 
 /**
+ * How a category is written for a person to read.
+ *
+ * Here rather than in a client because the server writes it too: a push
+ * notification says "Delivery at the gate", and the phrase a resident reads on
+ * the lock screen should be the one the app shows when they open it. The clients
+ * add their own icon and tone on top; only the wording is shared.
+ */
+export const VISITOR_CATEGORY_LABELS = {
+  delivery: "Delivery",
+  guest: "Guest",
+  service: "Service",
+  cab: "Cab",
+  staff: "Daily help",
+};
+
+export const catLabel = (category) => VISITOR_CATEGORY_LABELS[category] || VISITOR_CATEGORY_LABELS.guest;
+
+/**
  * Gate lifecycle. The API rejects any transition not listed here, so a stale
  * client cannot, say, admit a visitor the resident already denied.
  */

@@ -1,0 +1,41 @@
+/**
+ * Monorepo-aware settings.
+ *
+ * The stock template hardcodes ../node_modules/@react-native/gradle-plugin.
+ * Under npm workspaces that package is hoisted to the repo root instead, so the
+ * literal path does not exist and the build fails before it starts. Asking Node
+ * to resolve it finds it wherever npm decided to put it, which also means this
+ * keeps working if the hoisting changes.
+ *
+ * The resolution is inlined twice rather than pulled into a helper because
+ * Gradle allows no statements between pluginManagement {} and plugins {}.
+ */
+pluginManagement {
+  includeBuild(
+    new File(
+      providers.exec {
+        workingDir(rootDir)
+        commandLine("node", "--print", "require.resolve('@react-native/gradle-plugin/package.json')")
+      }.standardOutput.asText.get().trim()
+    ).getParentFile().absolutePath
+  )
+}
+
+plugins { id("com.facebook.react.settings") }
+
+extensions.configure(com.facebook.react.ReactSettingsExtension){ ex -> ex.autolinkLibrariesFromCommand() }
+
+rootProject.name = 'com.gvs.prangan'
+include ':app'
+
+/* The pluginManagement include above only exposes the plugin. This second one
+   substitutes the com.facebook.react:react-native-gradle-plugin dependency, and
+   the template ships both. */
+includeBuild(
+  new File(
+    providers.exec {
+      workingDir(rootDir)
+      commandLine("node", "--print", "require.resolve('@react-native/gradle-plugin/package.json')")
+    }.standardOutput.asText.get().trim()
+  ).getParentFile().absolutePath
+)

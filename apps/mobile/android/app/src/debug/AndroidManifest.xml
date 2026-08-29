@@ -1,0 +1,15 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application>
+        <!--
+          Debug-only. Merged into debug builds and absent from release ones, so
+          the exported receiver below cannot ship. See GateTestReceiver.
+        -->
+        <receiver
+            android:name=".GateTestReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.gvs.prangan.TEST_GATE" />
+            </intent-filter>
+        </receiver>
+    </application>
+</manifest>

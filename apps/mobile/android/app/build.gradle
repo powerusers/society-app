@@ -1,0 +1,174 @@
+import groovy.json.JsonSlurper
+
+/** The Firebase BoM version @react-native-firebase/app pins, read from its package.json. */
+def firebaseBomVersion() {
+    def pkg = file(providers.exec {
+        workingDir(rootDir)
+        commandLine("node", "--print", "require.resolve('@react-native-firebase/app/package.json')")
+    }.standardOutput.asText.get().trim())
+    return new JsonSlurper().parse(pkg).sdkVersions.android.firebase
+}
+
+apply plugin: "com.android.application"
+apply plugin: "org.jetbrains.kotlin.android"
+apply plugin: "com.facebook.react"
+
+/**
+ * Firebase, only if it has been configured.
+ *
+ * The google-services plugin fails the build outright when google-services.json
+ * is missing, which would mean nobody could build this app at all until somebody
+ * created a Firebase project. Push is an enhancement to screens that already
+ * work by fetching, so it is opt-in: drop the file in and it lights up.
+ *
+ * The file is gitignored — it identifies one Firebase project and does not
+ * belong to every fork of this repo.
+ */
+def googleServicesJson = file("google-services.json")
+if (googleServicesJson.exists()) {
+    apply plugin: "com.google.gms.google-services"
+    println("[prangan] google-services.json found — push notifications enabled")
+} else {
+    println("[prangan] no google-services.json — building without push notifications")
+}
+
+/**
+ * This is the configuration block to customize your React Native Android app.
+ * By default you don't need to apply any configuration, just uncomment the lines you need.
+ */
+react {
+    /**
+     * Monorepo paths.
+     *
+     * Every default in this block is written relative to the app folder —
+     * ../../node_modules/@react-native/codegen and so on. npm workspaces hoists
+     * those packages to the repo root instead, so the defaults point at nothing.
+     *
+     * Setting them here is enough for the whole build, not just this module:
+     * ReactPlugin copies the application's values onto the root extension, and
+     * every autolinked library's codegen task reads them back from there. Without
+     * this, each native library fails its own generateCodegenSchemaFromJavaScript.
+     *
+     * Resolved through Node so the paths follow npm's hoisting decisions rather
+     * than restating them.
+     */
+    reactNativeDir = file(providers.exec {
+        workingDir(rootDir)
+        commandLine("node", "--print", "require('path').dirname(require.resolve('react-native/package.json'))")
+    }.standardOutput.asText.get().trim())
+
+    codegenDir = file(providers.exec {
+        workingDir(rootDir)
+        commandLine("node", "--print", "require('path').dirname(require.resolve('@react-native/codegen/package.json'))")
+    }.standardOutput.asText.get().trim())
+
+    /* Autolinking */
+    autolinkLibrariesWithApp()
+}
+
+/**
+ * One APK per ABI.
+ *
+ * A universal APK carries native libraries for all four architectures, which is
+ * roughly 60MB to deliver about 20MB of app — every phone downloads three
+ * architectures it cannot run. Splitting keeps `assembleRelease` honest for
+ * sideloading and CI.
+ *
+ * `bundleRelease` (the .aab for the Play Store) ignores this: Play does the
+ * splitting itself and serves each device only its own ABI, which is the better
+ * path for an actual release.
+ */
+android {
+    splits {
+        abi {
+            enable true
+            reset()
+            include((project.findProperty("reactNativeArchitectures")
+                ?: "armeabi-v7a,arm64-v8a,x86,x86_64").split(",") as String[])
+            // Keep the fat APK too — it is the one to hand someone directly.
+            universalApk true
+        }
+    }
+}
+
+/**
+ * Set this to true to Run Proguard on Release builds to minify the Java bytecode.
+ */
+def enableProguardInReleaseBuilds = false
+
+/**
+ * The preferred build flavor of JavaScriptCore (JSC)
+ *
+ * For example, to use the international variant, you can use:
+ * `def jscFlavor = io.github.react-native-community:jsc-android-intl:2026004.+`
+ *
+ * The international variant includes ICU i18n library and necessary data
+ * allowing to use e.g. `Date.toLocaleString` and `String.localeCompare` that
+ * give correct results when using with locales other than en-US. Note that
+ * this variant is about 6MiB larger per architecture than default.
+ */
+def jscFlavor = 'io.github.react-native-community:jsc-android:2026004.+'
+
+android {
+    ndkVersion rootProject.ext.ndkVersion
+    buildToolsVersion rootProject.ext.buildToolsVersion
+    compileSdk rootProject.ext.compileSdkVersion
+
+    namespace "com.gvs.prangan"
+    defaultConfig {
+        applicationId "com.gvs.prangan"
+        minSdkVersion rootProject.ext.minSdkVersion
+        targetSdkVersion rootProject.ext.targetSdkVersion
+        versionCode 1
+        versionName "1.0"
+    }
+    signingConfigs {
+        debug {
+            storeFile file('debug.keystore')
+            storePassword 'android'
+            keyAlias 'androiddebugkey'
+            keyPassword 'android'
+        }
+    }
+    buildTypes {
+        debug {
+            signingConfig signingConfigs.debug
+        }
+        release {
+            // Caution! In production, you need to generate your own keystore file.
+            // see https://reactnative.dev/docs/signed-apk-android.
+            signingConfig signingConfigs.debug
+            minifyEnabled enableProguardInReleaseBuilds
+            proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"
+        }
+    }
+}
+
+dependencies {
+    // The version of react-native is set by the React Native Gradle Plugin
+    implementation("com.facebook.react:react-android")
+
+    /**
+     * Firebase Messaging, for this module's own code.
+     *
+     * PranganMessagingService and GateAlert reference the SDK directly, and
+     * @react-native-firebase/messaging keeps it as an `implementation`
+     * dependency, so it is not on this module's compile classpath by
+     * inheritance.
+     *
+     * The BoM version is read from @react-native-firebase/app's own pin rather
+     * than restated, so the two cannot drift into a version conflict the next
+     * time that package is upgraded.
+     */
+    implementation platform("com.google.firebase:firebase-bom:${firebaseBomVersion()}")
+    implementation("com.google.firebase:firebase-messaging")
+
+    // Notification builders, for the full-screen intent.
+    implementation("androidx.core:core-ktx:1.13.1")
+
+    if (hermesEnabled.toBoolean()) {
+        implementation("com.facebook.react:hermes-android")
+    } else {
+        implementation jscFlavor
+    }
+}

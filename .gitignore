@@ -12,3 +12,7 @@ dist
 
 # api
 apps/api/.env
+
+# Firebase service account — this is a private key. Never commit it.
+firebase-service-account.json
+**/google-services.json

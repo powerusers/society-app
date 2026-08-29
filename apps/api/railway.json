@@ -2,7 +2,8 @@
   "$schema": "https://railway.com/railway.schema.json",
   "build": {
     "builder": "NIXPACKS",
-    "buildCommand": "npm install --include=dev --no-audit --no-fund"
+    "buildCommand": "npm install --workspace @gvs/api --include-workspace-root --include=dev --no-audit --no-fund",
+    "comment": "Scoped to this service's workspace. apps/mobile is an npm workspace too, and an unscoped install at the repo root drags React Native, Firebase, VisionCamera and the rest of the Android toolchain into a deployment that will never run them \u2014 1108 packages instead of ~245, and a much larger image. --include-workspace-root keeps @gvs/shared linked."
   },
   "deploy": {
     "startCommand": "npm start --workspace @gvs/api",

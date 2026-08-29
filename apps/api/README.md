@@ -35,6 +35,18 @@ Integration tests only — they run against a real Postgres, migrate and seed it
 then drive HTTP. `test/setup.js` refuses to run unless `DATABASE_URL` names a
 database ending in `_test`, because the suite truncates every table.
 
+Point it somewhere else by overriding that variable, which is useful when 5432
+is already taken:
+
+```bash
+DATABASE_URL=postgres://gvs:gvs@127.0.0.1:55433/gvs_test \
+  npm run test --workspace @gvs/api
+```
+
+`test/push.test.js` is worth knowing about specifically: it asserts that a gate
+request reaches only the flat it was raised against, and nobody else. See
+[Who a gate request reaches](#who-a-gate-request-reaches).
+
 ## Endpoints
 
 | Method | Path | Notes |
@@ -67,6 +79,92 @@ database ending in `_test`, because the suite truncates every table.
 | `GET` | `/api/documents/:id/download` | Short-lived presigned GET, forced to `attachment` |
 | `DELETE` | `/api/documents/:id` | Removes the row and the object |
 | `POST` | `/api/documents/sweep` | Clears abandoned uploads, admin only |
+| `POST` | `/api/devices` | Registers a push token; re-points it if the phone changed hands |
+| `DELETE` | `/api/devices` | Drops this device, on sign-out |
+
+## Push notifications (FCM)
+
+Optional. Without it the API runs exactly as before and the apps still work — a
+gate request is recorded and shows up on the resident's next fetch. What is lost
+is the part that matters most: the resident learning about it while the guard is
+still standing at the gate with somebody in front of them.
+
+Two transitions send, and only two. A notification for every step of the
+lifecycle is how people learn to swipe them all away.
+
+| Transition | Goes to | How it arrives |
+|---|---|---|
+| → `pending` (guard sends to the flat) | Everyone living in that flat, except whoever pressed the button | **Data-only**, so the app raises a ringing full-screen approval screen over the lock screen |
+| → `approved` / `denied` | The guard who raised it | Ordinary notification — nobody is waiting on the guard to act |
+
+The gate request is sent **data-only on purpose**. A message carrying a
+`notification` block is drawn by the Android system before any app code runs, and
+the app's background handler is never called — which would leave no chance to
+attach the full-screen intent that wakes a locked phone. The cost is that a
+force-stopped app receives nothing, because Android will not restart a process
+the user explicitly killed; the request is still waiting when they next open the
+app. See `apps/mobile/README.md` for the device half.
+
+Setup is in `.env.example`: create a Firebase project, take a service account key
+from **Project settings → Service accounts**, and supply it as
+`FCM_SERVICE_ACCOUNT_JSON` (one line, suits Railway) or
+`GOOGLE_APPLICATION_CREDENTIALS` (a path, suits a local checkout). The Android
+app needs the matching `google-services.json` — see `apps/mobile/README.md`.
+
+### Who a gate request reaches
+
+A visitor at A-401 is A-401's business. The scoping is two steps, and
+`test/push.test.js` covers both — it is the privacy boundary of the feature, so
+it is tested rather than assumed:
+
+1. **`usersInFlat(societyId, flatId)`** picks the people: active members of that
+   one flat, in that one society. A committee member who lives in B-201 is not
+   included, despite holding `gate.view` — seeing the whole gate on a screen they
+   opened is not the same as being woken by every visitor in the society.
+2. **`recipientTokens(userIds, pref)`** picks their devices: rows in
+   `device_tokens` belonging to those users, still active, and not muted.
+
+The guard who pressed the button is filtered out in between — they do not need
+telling what they just did.
+
+Some consequences that fall out of reading `users.flat_id` live, rather than
+copying it onto the token:
+
+- A resident who moves flats immediately starts getting the new flat's requests
+  and stops getting the old one's.
+- A suspended member's phone stops receiving. Their row remains; being suspended
+  should not mean still being told who is at the gate.
+- A whole household is notified, not just the first match — several people, and
+  often several phones each. Whoever is nearest the door can answer.
+
+**A phone that changes hands** is handled by `UNIQUE (token)` plus the upsert in
+`POST /api/devices`: registering re-points the existing row at whoever is signed
+in now, rather than adding a second. Sign-out deletes it outright, and that
+delete is scoped to the caller — a token is a delivery address, and letting
+anyone delete an arbitrary one would let them silence a neighbour's gate alerts.
+The residual case is a phone given away and never signed into again, whose token
+lingers until FCM reports it `UNREGISTERED` (which an uninstall triggers).
+
+Things worth knowing before changing this:
+
+- **Sending never fails a request.** `sendToUsers()` resolves rather than
+  throws, and the call site is wrapped besides. The transition has already
+  committed by then; turning a push failure into a 500 would fail the write that
+  actually mattered and leave a guard retrying an approval that already
+  happened.
+- **It runs after the transaction, never inside it.** FCM is sometimes slow, and
+  holding a row lock on the gate's busiest table while waiting on someone else's
+  HTTP call is how a busy gate stops working.
+- **Dead tokens are pruned as they are found.** `UNREGISTERED`,
+  `INVALID_ARGUMENT` and `SENDER_ID_MISMATCH` mean the token will fail forever —
+  an uninstalled app would otherwise be retried on every visitor for years.
+- **`notify` preferences are honoured in the query**, not after it. Absent means
+  on, so a resident who has never opened the profile screen still hears about
+  somebody at their gate; only an explicit `false` excludes them.
+- **The client is told whether push actually works.** `POST /api/devices`
+  answers with `pushConfigured`, so the app can say "alerts only while open"
+  rather than promising notifications a credential-less deployment will never
+  send.
 
 ## Document storage (S3)
 

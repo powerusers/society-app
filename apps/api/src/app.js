@@ -20,6 +20,7 @@ import { vehiclesRouter } from "./routes/vehicles.js";
 import { helpRouter } from "./routes/help.js";
 import { incidentsRouter } from "./routes/incidents.js";
 import { documentsRouter } from "./routes/documents.js";
+import { devicesRouter } from "./routes/devices.js";
 import { errorHandler, notFoundHandler } from "./middleware/errorHandler.js";
 import { pool } from "./db/pool.js";
 
@@ -82,6 +83,7 @@ export function createApp() {
   app.use("/api/help", helpRouter);
   app.use("/api/incidents", incidentsRouter);
   app.use("/api/documents", documentsRouter);
+  app.use("/api/devices", devicesRouter);
 
   app.use(notFoundHandler);
   app.use(errorHandler);

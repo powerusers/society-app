@@ -13,14 +13,15 @@ backend or hardware work.
 ```
 apps/
   web/        React SPA — the resident, guard and committee app
+  mobile/     React Native Android app (see apps/mobile/README.md)
   api/        Express + Postgres API (see apps/api/README.md)
 packages/
   shared/     capability matrix, bill calculation, validation schemas
 ```
 
 `packages/shared` is the point of the monorepo: the authorization table, the
-bill calculator and the request schemas are imported by both halves, so the
-rules cannot drift apart. The web app's checks decide what to render; the API
+bill calculator and the request schemas are imported by all three, so the rules
+cannot drift apart. Each client's checks decide what to render; the API
 re-checks everything for real.
 
 ## Running it
@@ -29,6 +30,10 @@ re-checks everything for real.
 npm install
 npm run dev:web    # http://localhost:3000
 npm run build      # production bundle into apps/web/dist
+
+# Android — needs the API running; see apps/mobile/README.md
+npm run dev:mobile     # Metro
+npm run android        # build and install on a device or emulator
 
 # API — needs Postgres, and S3 for the document vault
 cp apps/api/.env.example apps/api/.env
@@ -57,11 +62,17 @@ VITE_API_URL=http://localhost:4000 npm run build   # live
 npm run build                                      # demo, no server needed
 ```
 
-Migrated to the API: authentication and session, the gate lifecycle, bills and
-payments, the billing run with maker-checker, the helpdesk, and the document
-vault. Still on the local store because they have no endpoints yet: notices,
-polls, amenities, the forum, incidents, patrols, daily help, vehicles, and the
-ledger and reports screens.
+Every repository hook in `src/data` now goes through the API: authentication and
+session, the gate lifecycle, bills and payments, the billing run with
+maker-checker, the helpdesk, the document vault, notices, polls, the forum,
+amenities, vehicles, daily help, incidents, the directory and the flat and
+resident registers.
+
+What is still read from the local store is the handful of screens that never got
+a repository hook — patrolling, the walkie-talkie, and the accounting screens
+(ledger, budget vs actual, bank reconciliation and the report exports). Those are
+the parts the Android app leaves on the web, since there is no endpoint behind
+them to call.
 
 ## Signing in
 
